@@ -1,18 +1,19 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "AI Job Matching Platform Backend",
   "type": "module",
+
+  "scripts": {
+    "validate": "sam validate",
+    "build": "sam build",
+    "deploy": "sam deploy --guided",
+    "local:fetchJobs": "sam local invoke FetchJobsFunction -e events/searchJobs.json"
+  },
+
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "serverless-plugin-typescript": "^2.1.5",
+    "esbuild": "^0.28.0",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   }
