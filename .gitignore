@@ -44,3 +44,9 @@ Thumbs.db
 
 # Optional test/coverage output
 coverage/
+
+# AWS SAM build output
+.aws-sam/
+
+# Old Serverless Framework output
+.serverless/
