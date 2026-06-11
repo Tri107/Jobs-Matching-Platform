@@ -1,0 +1,63 @@
+JOB MATCHING PLATFORM
+Hệ thống được chia thành 3 phân vùng chức năng chính và một phân vùng quản trị dùng chung.
+
+Phân vùng 1: Thu Thập Dữ Liệu Việc Làm (Jobs Ingestion)
+
+Mục tiêu: Tự động hóa quy trình thu thập, chuẩn hóa và lưu trữ tin tuyển dụng từ các nguồn bên ngoài theo định kỳ.
+Chi tiết luồng xử lý:
+	1. Amazon EventBridge Scheduler kích hoạt trigger theo chu kỳ thời gian.
+	2. Lambda Function được gọi để thực hiện gửi request lấy dữ liệu thô từ API bên ngoài (SerpAPI).
+	3. Dữ liệu thô sau khi thu thập được chuyển qua Lambda Function khác để làm sạch, chuẩn hoá dữ liệu, và loại bỏ trùng lặp.
+	4. Dữ liệu tin tuyển dụng hoàn chỉnh được lưu trữ vào Amazon DynamoDB (Job Table).
+
+Phân vùng 2: Tương Tác Người Dùng (User Interaction)
+
+Mục tiêu: Cung cấp giao diện trực quan cho người dùng cuối và xử lý các nghiệp vụ cốt lõi: 
+- Quản lý tài khoản 
+- Tạo CV 
+- Tìm kiếm việc làm
+- Lưu tin tuyển dụng.
+
+Chi tiết luồng xử lý:
+
+1. Người dùng truy cập ứng dụng thông qua Web được hosting AWS Amplify.
+2. Các request đều phải đi qua AWS WAF để chặn các cuộc tấn công phổ biến như XSS hoặc lọc bỏ các request độc hại trước khi đi vào hệ thống.
+3. API Gateway tiếp nhận các request, thực hiện điều phối luồng, kiểm soát băng thông.
+4. Amazon Cognito chịu trách nhiệm xác thực và phân quyền người dùng (Đăng ký, đăng nhập, cấp JWT Token).
+5. Các tác vụ nghiệp vụ được xử lý bởi AWS Lambda (Show Jobs, Search/Filter).
+6. Khi người dùng lưu tin tuyển dụng, thông tin sẽ được lưu vào Amazon DynamoDB (Favourite Table), các file CV (PDF) được upload và lưu trữ tại Amazon S3 Bucket.
+
+Phân vùng 3: Đánh giá độ phù hợp của CV Bằng AI (CV Matching Flow)
+
+Mục tiêu: Ứng dụng AI đánh giá độ phù hợp của CV với công việc người dùng muốn ứng tuyển.
+
+Chi tiết luồng xử lý:
+
+	1. Khi người gửi request đến chức năng Evaluate Matching, Lamda tiến hành lấy dữ liệu của công việc được chọn từ DynamoDB (Job Table) và lấy file CV của người dùng.
+	2. Hàm Lambda gửi file CV đến Amazon Textract trích xuất các thông tin quan trọng liên quan đến công việc (Kỹ năng, số năm kinh nghiệm, học vấn).
+	3. Văn bản và từ khóa sau xử lý được đẩy vào Amazon Bedrock để tính toán độ tương đồng với kho dữ liệu Job có sẵn.
+	4. Kết quả đánh giá (Matching Score) được ghi vào Amazon DynamoDB (Match Result Table) để hiển thị lại cho người dùng.
+
+Phân vùng quản trị tài nguyên dùng chung (Cost, Sercurity, Operation).
+
+Phân vùng này chịu trách nhiệm thiết lập nền tảng bảo mật, giám sát vận hành và quản lý ngân sách cho toàn bộ các dịch vụ (Jobs Ingestion, User Interaction, CV Matching Flow) chạy trên hạ tầng AWS.
+
+1. Quản lý Định danh và Truy cập - IAM
+	
+Chức năng: Quản lý quyền hạn và xác thực giữa các dịch vụ nội bộ bên trong hệ thống đám mây AWS.
+Vai trò kiến trúc: Áp dụng mô hình Principle of Least Privilege(quyền hạn tối thiểu)
+
+2. Quản lý Chuỗi bí mật & Khóa bảo mật - API Keys
+
+Chức năng: Lưu trữ, quản lý và mã hóa tập trung các thông tin nhạy cảm.
+Vai trò kiến trúc: Đảm bảo nguyên tắc bảo mật mã nguồn.
+
+3. Giám sát & Cảnh báo - Logs/Alarm (Amazon CloudWatch)
+
+Chức năng: Thu thập dữ liệu nhật ký hệ thống (Logs), các chỉ số hiệu năng (Metrics) và tự động kích hoạt cảnh báo (Alarms).
+Vai trò kiến trúc: Đảm bảo tính quan sát được (Observability) của hệ thống Serverless.
+
+4. Quản lý Ngân sách & Tối ưu Chi phí - Budget (AWS Budgets)
+
+Chức năng: Thiết lập các hạn mức chi phí tùy chỉnh và theo dõi chi tiêu thực tế trên hạ tầng AWS.
+Vai trò kiến trúc: Kiểm soát rủi ro tài chính của mô hình Serverless.

@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Jobs-Matching-Platform
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+
+  ProjectName:
+    Type: String
+    Default: jobs-matching
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures:
+      - x86_64
+    MemorySize: 256
+    Timeout: 30
+    LoggingConfig:
+      LogFormat: JSON
+    Environment:
+      Variables:
+        STAGE: !Ref StageName
+
+Resources:
+ 
+
+Outputs:
+ 
