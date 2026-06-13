@@ -12,7 +12,7 @@ Parameters:
     Default: jobs-matching
 
   SerpApiKey:
-    Type: AWS::SSM::Parameter::Value<String>
+    Type: String
     Description: API Key for SerpAPI (Google Jobs) - stored in SSM Parameter Store
     Default: /jobs-matching/dev/serpapi-key
 
@@ -30,6 +30,7 @@ Globals:
         STAGE: !Ref StageName
 
 Resources:
+# SQS Queues
   RawJobsDLQ:
     Type: AWS::SQS::Queue
     Properties:
@@ -45,6 +46,29 @@ Resources:
         deadLetterTargetArn: !GetAtt RawJobsDLQ.Arn
         maxReceiveCount: 3
 
+# DynamoDB Tables
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-jobs-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: jobId
+          AttributeType: S
+        - AttributeName: hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jobId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: HashIndex
+          KeySchema:
+            - AttributeName: hash
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+# Lambda Functions
   FetchJobsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -66,6 +90,48 @@ Resources:
         Sourcemap: true
         EntryPoints: 
         - src/functions/fetchJobs/handler.ts
+
+  ProcessJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/functions/processJobs/handler.handler
+      Description: Receive SQS messages and process/forward them
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NormalizeAndMatchFunction
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt RawJobsQueue.Arn
+            BatchSize: 10
+      Environment:
+        Variables:
+          NORMALIZE_MATCH_FUNCTION_NAME: !Ref NormalizeAndMatchFunction
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - src/functions/processJobs/handler.ts
+
+  NormalizeAndMatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/normalizeAndMatch
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      Description: Normalize job and perform deduplication hashing and fuzzy matching
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
 
 
 Outputs:
