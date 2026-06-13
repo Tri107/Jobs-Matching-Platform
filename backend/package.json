@@ -3,18 +3,19 @@
   "version": "1.0.0",
   "description": "AI Job Matching Platform Backend",
   "type": "module",
-
   "scripts": {
     "validate": "sam validate",
     "build": "sam build",
-    "deploy": "sam deploy --guided",
-    "local:fetchJobs": "sam local invoke FetchJobsFunction -e events/searchJobs.json"
+    "deploy": "sam deploy --guided"
   },
-
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.162",
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1066.0"
   }
 }

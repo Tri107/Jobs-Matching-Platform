@@ -11,6 +11,11 @@ Parameters:
     Type: String
     Default: jobs-matching
 
+  SerpApiKey:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: API Key for SerpAPI (Google Jobs) - stored in SSM Parameter Store
+    Default: /jobs-matching/dev/serpapi-key
+
 Globals:
   Function:
     Runtime: nodejs24.x
@@ -25,7 +30,51 @@ Globals:
         STAGE: !Ref StageName
 
 Resources:
- 
+  RawJobsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-raw-jobs-dlq-${StageName}"
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  RawJobsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-raw-jobs-queue-${StageName}"
+      VisibilityTimeout: 60 # Should be >= Lambda timeout processing it
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt RawJobsDLQ.Arn
+        maxReceiveCount: 3
+
+  FetchJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/functions/fetchJobs/handler.handler
+      Description: Fetch jobs from SerpAPI and push to SQS
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt RawJobsQueue.QueueName
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref RawJobsQueue
+          SERPAPI_KEY: !Ref SerpApiKey
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - src/functions/fetchJobs/handler.ts
+
 
 Outputs:
- 
+  RawJobsQueueUrl:
+    Description: "URL of the Raw Jobs SQS Queue"
+    Value: !Ref RawJobsQueue
+  RawJobsQueueArn:
+    Description: "ARN of the Raw Jobs SQS Queue"
+    Value: !GetAtt RawJobsQueue.Arn
+  FetchJobsFunction:
+    Description: "Fetch Jobs Lambda Function ARN"
+    Value: !GetAtt FetchJobsFunction.Arn

@@ -18,6 +18,8 @@ build/
 .env.*
 !.env.example
 !.env.template
+env.json
+samconfig.toml
 
 
 .DS_Store
