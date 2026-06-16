@@ -1,89 +1,39 @@
-import os
 import json
 import hashlib
 import uuid
-import re
-from datetime import datetime, timezone, timedelta
-import difflib
-import boto3
-from boto3.dynamodb.conditions import Key, Attr
+from datetime import datetime, timezone
 
-# Initialize DynamoDB Client
-JOBS_TABLE = os.environ.get("JOBS_TABLE")
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(JOBS_TABLE) if JOBS_TABLE else None
+from repository import JobRepository
+from normalize import normalize_title, normalize_posted_at
+from match import check_exact_duplicate, check_fuzzy_duplicate
 
-def normalize_title(title: str) -> str:
-    if not title:
-        return ""
-    # Convert to lowercase
-    cleaned = title.lower()
-    # Strip bracketed/parenthesized content
-    cleaned = re.sub(r"\[.*?\]|\(.*?\)", "", cleaned)
-    # Clean separators and noise characters
-    cleaned = re.sub(r"[-/|:,_]", " ", cleaned)
-    # Clean level adjectives / noise words
-    noise_words = [
-        r"\bsenior\b", r"\bjunior\b", r"\bfresher\b", r"\binternship\b", r"\bintern\b",
-        r"\blead\b", r"\bprincipal\b", r"\bstaff\b", r"\bmid\b", r"\bentry\b", r"\blevel\b",
-        r"\bhcm\b", r"\bhn\b", r"\bhanoi\b", r"\bdanang\b", r"\bvietnam\b", r"\bvn\b", r"\bcity\b",
-        r"\btuyển dụng\b", r"\bviệc làm\b", r"\btuyển\b", r"\bgấp\b"
-    ]
-    for noise in noise_words:
-        cleaned = re.sub(noise, "", cleaned)
-    
-    # Standardize developer/engineer synonyms
-    cleaned = re.sub(r"\bback-end\b", "backend", cleaned)
-    cleaned = re.sub(r"\bfront-end\b", "frontend", cleaned)
-    cleaned = re.sub(r"\bsoftware developer\b|\bsoftware engineer\b|\bdeveloper\b|\bengineer\b|\bdev\b", "developer", cleaned)
-    
-    # Strip extra whitespaces
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned
-
-def normalize_posted_at(posted_at_str: str) -> str:
-    now = datetime.now(timezone.utc)
-    if not posted_at_str:
-        return now.strftime("%Y-%m-%d")
-    
-    cleaned = posted_at_str.lower().strip()
-    
-    # Check for today, yesterday, hours/minutes/seconds ago
-    if any(word in cleaned for word in ["hôm nay", "vừa xong", "mới", "hour", "giờ", "minute", "phút", "giây", "second"]):
-        return now.strftime("%Y-%m-%d")
-    if "hôm qua" in cleaned or "yesterday" in cleaned:
-        return (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        
-    # Extract number
-    match = re.search(r"(\d+)", cleaned)
-    if not match:
-        return now.strftime("%Y-%m-%d")
-    
-    num = int(match.group(1))
-    
-    # Check units
-    if "ngày" in cleaned or "day" in cleaned:
-        days = num
-    elif "tuần" in cleaned or "week" in cleaned:
-        days = num * 7
-    elif "tháng" in cleaned or "month" in cleaned:
-        days = num * 30
-    else:
-        days = num
-        
-    est_date = now - timedelta(days=days)
-    return est_date.strftime("%Y-%m-%d")
+# Initialize repository globally to reuse DynamoDB client connection
+try:
+    repository = JobRepository()
+except Exception as e:
+    print(f"Warning: Repository initialization failed (likely local environment without environment variables): {e}")
+    repository = None
 
 def lambda_handler(event, context):
     print("Received raw event:", json.dumps(event))
     
-    if not table:
-        raise ValueError("JOBS_TABLE environment variable not configured or table initialization failed")
-    
+    global repository
+    if not repository:
+        # Fallback reload just in case
+        repository = JobRepository()
+
     # 1. Extract required information
     original_title = event.get("title") or event.get("job_title", "")
     company_name = event.get("company_name", "")
     location = event.get("location", "")
+    
+    if not original_title or not company_name:
+        print("Warning: Missing required fields (title, company_name) in event payload. Rejecting.")
+        return {
+            "status": "rejected",
+            "reason": "missing_required_fields",
+            "received_fields": list(event.keys())
+        }
     
     detected_extensions = event.get("detected_extensions", {})
     original_posted_at = detected_extensions.get("posted_at")
@@ -109,14 +59,9 @@ def lambda_handler(event, context):
     hash_object = hashlib.sha256(combined_string.encode("utf-8"))
     sha256_hash = hash_object.hexdigest()
     
-    # Query DynamoDB using the HashIndex GSI
+    # Check exact match
     print(f"Checking hash uniqueness: {sha256_hash}")
-    hash_query = table.query(
-        IndexName="HashIndex",
-        KeyConditionExpression=Key("hash").eq(sha256_hash)
-    )
-    
-    if hash_query.get("Items"):
+    if check_exact_duplicate(sha256_hash, repository):
         print("Duplicate detected (exact hash match). Rejecting.")
         return {
             "status": "duplicate",
@@ -125,33 +70,18 @@ def lambda_handler(event, context):
         }
         
     # Step 2: Fuzzy Matching
-    # Scan based on company_name to find candidates for comparison
     print(f"Scanning table for candidates with company: {company_name}")
-    scan_response = table.scan(
-        FilterExpression=Attr("companyName").eq(company_name)
-    )
-    candidates = scan_response.get("Items", [])
-    
-    new_match_str = f"{normalized_title} {company_name} {location}".lower()
-    
-    for candidate in candidates:
-        candidate_title = candidate.get("title", "")
-        candidate_company = candidate.get("companyName", "")
-        candidate_location = candidate.get("location", "")
-        
-        cand_match_str = f"{candidate_title} {candidate_company} {candidate_location}".lower()
-        
-        similarity = difflib.SequenceMatcher(None, new_match_str, cand_match_str).ratio()
-        print(f"Comparing with job {candidate.get('jobId')}. Similarity: {similarity:.2f}")
-        
-        if similarity > 0.8:
-            print(f"Duplicate detected (fuzzy match similarity {similarity:.2f} > 0.8). Rejecting.")
-            return {
-                "status": "duplicate",
-                "reason": "fuzzy_match",
-                "similarity": similarity,
-                "matched_job_id": candidate.get("jobId")
-            }
+    fuzzy_result = check_fuzzy_duplicate(normalized_title, company_name, location, repository)
+    if fuzzy_result.get("is_duplicate"):
+        similarity = fuzzy_result.get("similarity")
+        matched_job_id = fuzzy_result.get("matched_job_id")
+        print(f"Duplicate detected (fuzzy match similarity {similarity:.2f} > 0.8). Rejecting.")
+        return {
+            "status": "duplicate",
+            "reason": "fuzzy_match",
+            "similarity": similarity,
+            "matched_job_id": matched_job_id
+        }
             
     # 4. Insert into DynamoDB
     job_id = str(uuid.uuid4())
@@ -171,7 +101,7 @@ def lambda_handler(event, context):
     }
     
     print(f"Inserting new job: {job_id}")
-    table.put_item(Item=new_job)
+    repository.insert(new_job)
     
     return {
         "status": "inserted",
