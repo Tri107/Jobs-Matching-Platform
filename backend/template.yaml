@@ -121,8 +121,8 @@ Resources:
   NormalizeAndMatchFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/functions/normalizeAndMatch
-      Handler: app.lambda_handler
+      CodeUri: src
+      Handler: functions/normalizeAndMatch/handler.lambda_handler
       Runtime: python3.13
       Description: Normalize job and perform deduplication hashing and fuzzy matching
       Timeout: 30

@@ -1,5 +1,6 @@
 import type { SQSEvent } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import type { RawJob, NormalizeMatchResult } from "../types/job.js";
 
 export class ProcessJobsService {
   private lambdaClient: LambdaClient;
@@ -16,7 +17,7 @@ export class ProcessJobsService {
         console.log(`Processing message: ${record.messageId}`);
         
         // The body is a JSON string of the raw job
-        const rawJob = JSON.parse(record.body);
+        const rawJob = JSON.parse(record.body) as RawJob;
 
         // Invoke Python Lambda function
         const invokeCommand = new InvokeCommand({
@@ -32,7 +33,9 @@ export class ProcessJobsService {
           throw new Error(`Process failed: ${response.FunctionError}`);
         }
 
-        const responsePayload = response.Payload ? JSON.parse(Buffer.from(response.Payload).toString()) : null;
+        const responsePayload = response.Payload 
+          ? (JSON.parse(Buffer.from(response.Payload).toString()) as NormalizeMatchResult) 
+          : null;
         console.log(`Processed message ${record.messageId}. Result:`, JSON.stringify(responsePayload));
       } catch (error) {
         console.error(`Failed to process message ${record.messageId}:`, error);
