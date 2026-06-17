@@ -3,9 +3,13 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 
-from repository import JobRepository
-from normalize import normalize_title, normalize_posted_at
-from match import check_exact_duplicate, check_fuzzy_duplicate
+from repositories.jobRepository import JobRepository
+from services.matchAndNormalizeService import (
+    normalize_title,
+    normalize_posted_at,
+    check_exact_duplicate,
+    check_fuzzy_duplicate
+)
 
 # Initialize repository globally to reuse DynamoDB client connection
 try:

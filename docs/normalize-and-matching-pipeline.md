@@ -12,13 +12,12 @@ The pipeline runs as a serverless ingestion workflow triggered by incoming job p
 graph TD
     Queue[AWS SQS: RawJobsQueue] -->|Trigger SQS Event| H_TS[TS Handler: ProcessJobs]
     H_TS -->|Delegate| S_TS[TS Service: ProcessJobsService]
-    S_TS -->|Invoke Lambda| H_Py[Python Handler: app.py]
+    S_TS -->|Invoke Lambda| H_Py[Python Handler: handler.py]
     
-    subgraph Python Processing Lambda
-        H_Py -->|1. Clean & Format| Norm[normalize.py]
-        H_Py -->|2. Check Duplicates| Match[match.py]
-        Match -->|3. Query DynamoDB| Repo[repository.py]
-        H_Py -->|4. Save Job| Repo
+    subgraph Python Processing (CodeUri: src)
+        H_Py -->|1. Clean, Format & Match| Serv[services/matchAndNormalizeService.py]
+        H_Py -->|2. Database access| Repo[repositories/jobRepository.py]
+        Serv -->|3. Query candidates| Repo
     end
     
     Repo -->|GSI Query / Company Scan / PutItem| DB[(DynamoDB: JobsTable)]
@@ -36,12 +35,14 @@ backend/
 │   │   ├── processJobs/
 │   │   │   └── handler.ts         # TypeScript Lambda entrypoint (orchestrator)
 │   │   └── normalizeAndMatch/
-│   │       ├── app.py             # Python Lambda entrypoint (orchestrator)
-│   │       ├── normalize.py       # Text/Date normalization library
-│   │       ├── match.py           # Deduplication algorithms (exact & fuzzy matching)
-│   │       └── repository.py      # JobRepository class for DynamoDB database calls
-│   └── services/
-│       └── processJobsService.ts  # TypeScript service handling SQS parsing and lambda invocation
+│   │       └── handler.py         # Python Lambda entrypoint (handler)
+│   ├── repositories/
+│   │   └── jobRepository.py       # JobRepository class for DynamoDB database calls
+│   ├── services/
+│   │   ├── matchAndNormalizeService.py # Text/Date normalization & matching logic
+│   │   └── processJobsService.ts  # TypeScript service handling SQS parsing and lambda invocation
+│   └── types/
+│       └── job.ts                 # TypeScript interfaces for RawJob, Job, results
 ```
 
 ---
@@ -65,15 +66,15 @@ backend/
 
 ### B. Python Layer (Processor & Database)
 
-#### `src/functions/normalizeAndMatch/app.py` (Orchestrator)
+#### `src/functions/normalizeAndMatch/handler.py` (Handler)
 - **Role**: Synchronously invoked by the TS service. Coordinates normalization, deduplication, and database insertion.
 - **Workflow**:
   1. Validates event payload (rejects messages missing `title` or `company_name`).
-  2. Calls `normalize.py` to format titles and dates.
-  3. Checks exact-hash duplicates and fuzzy-similarity duplicates via `match.py`.
-  4. Calls `repository.py` to insert unique job records.
+  2. Calls functions in `matchAndNormalizeService.py` to format titles and dates.
+  3. Checks exact-hash duplicates and fuzzy-similarity duplicates.
+  4. Calls `jobRepository.py` to insert unique job records.
 
-#### `src/functions/normalizeAndMatch/normalize.py` (Helper)
+#### `src/services/matchAndNormalizeService.py` (Helper Service)
 - **Functions**:
   - `normalize_title(title: str) -> str`:
     - Converts to lowercase.
@@ -83,9 +84,6 @@ backend/
   - `normalize_posted_at(posted_at_str: str) -> str`:
     - Parses relative date descriptions (in both English and Vietnamese, e.g. `"4 ngày trước"`, `"yesterday"`).
     - Calculates the estimated posting date in `YYYY-MM-DD` format relative to UTC now.
-
-#### `src/functions/normalizeAndMatch/match.py` (Deduplication)
-- **Functions**:
   - `check_exact_duplicate(sha256_hash: str, repository: JobRepository) -> bool`:
     - Queries the database using `HashIndex` GSI for the given SHA-256 hash.
   - `check_fuzzy_duplicate(normalized_title: str, company_name: str, location: str, repository: JobRepository) -> dict`:
@@ -93,7 +91,7 @@ backend/
     - Compares `title + company_name + location` using `difflib.SequenceMatcher`.
     - Returns `is_duplicate=True` if similarity score is greater than `80%` (`> 0.8`).
 
-#### `src/functions/normalizeAndMatch/repository.py` (Repository Pattern)
+#### `src/repositories/jobRepository.py` (Repository Pattern)
 - **Class `JobRepository`**:
   - Encapsulates connection and table calls for `JobsTable`.
   - **Methods**:
