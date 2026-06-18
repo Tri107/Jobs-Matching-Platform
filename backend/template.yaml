@@ -72,9 +72,11 @@ Resources:
   FetchJobsFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub "${ProjectName}-fetch-jobs-${StageName}"
       CodeUri: .
       Handler: src/functions/fetchJobs/handler.handler
       Description: Fetch jobs from SerpAPI and push to SQS
+      Timeout: 120
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt RawJobsQueue.QueueName
@@ -82,6 +84,32 @@ Resources:
         Variables:
           QUEUE_URL: !Ref RawJobsQueue
           SERPAPI_KEY: !Ref SerpApiKey
+      Events:
+        DailyFetchJobsSchedule:
+          Type: ScheduleV2
+          Properties:
+            Name: !Sub "${ProjectName}-fetch-jobs-6am-${StageName}"
+            Description: "Run FetchJobsFunction every day at 06:00 Vietnam time"
+            ScheduleExpression: "cron(0 6 * * ? *)"
+            ScheduleExpressionTimezone: "Asia/Ho_Chi_Minh"
+            FlexibleTimeWindow:
+              Mode: "OFF"
+            State: ENABLED
+            Input: |
+              {
+                "source": "eventbridge-scheduler",
+                "location": "Vietnam",
+               "queries": [
+                  "Backend Developer",
+                  "Frontend Developer",
+                  "Cloud Engineer",
+                  "Tester",
+                  "Business Analyst",
+                  "IT Helpdesk",
+                  "Game Developer",
+                  "DevOps Engineer"
+                ]
+              }
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
