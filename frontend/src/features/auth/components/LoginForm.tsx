@@ -192,7 +192,7 @@ export function LoginForm() {
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300"
                   />
-                  Ghi nhớ tôi
+                  Lưu tài khoản
                 </label>
                 <a href="#" className="font-medium text-[#2d64ef] hover:text-[#214fc9]">
                   Quên mật khẩu?
