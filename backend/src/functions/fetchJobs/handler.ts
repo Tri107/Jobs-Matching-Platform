@@ -12,23 +12,50 @@ export const handler = async (event: any): Promise<any> => {
     throw new Error("Missing QUEUE_URL or SERPAPI_KEY environment variables");
   }
 
-  const query = event.query || "Backend Developer";
-  const location = event.location || "Ho Chi Minh City, Ho Chi Minh City, Vietnam";
+  const location = event.location || "Vietnam";
 
-  const jobs = await jobService.fetchJobsFromSerpApi(query, location, serpApiKey);
+  // EventBridge gửi mảng queries, test thủ công gửi 1 query string
+  const queries: string[] = event.queries
+    ? event.queries
+    : [event.query || "Backend Developer"];
 
-  console.log(`Found ${jobs.length} jobs.`);
+  let totalFound = 0;
+  let totalPushed = 0;
+  const results: Array<{ query: string; found: number; pushed: number }> = [];
 
-  let pushedCount = 0;
-  if (jobs.length > 0) {
-    pushedCount = await jobService.pushJobsToSQS(jobs, queueUrl);
+  for (const query of queries) {
+    try {
+      console.log(`--- Fetching: "${query}" in "${location}" ---`);
+      const jobs = await jobService.fetchJobsFromSerpApi(query, location, serpApiKey);
+
+      let pushedCount = 0;
+      if (jobs.length > 0) {
+        pushedCount = await jobService.pushJobsToSQS(jobs, queueUrl);
+      }
+
+      totalFound += jobs.length;
+      totalPushed += pushedCount;
+      results.push({ query, found: jobs.length, pushed: pushedCount });
+
+      // Delay 2s giữa các request để tránh rate limit SerpAPI
+      if (queries.length > 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    } catch (error) {
+      console.error(`Error fetching "${query}":`, error);
+      results.push({ query, found: 0, pushed: 0 });
+    }
   }
 
+  console.log(`=== SUMMARY: ${totalFound} jobs found, ${totalPushed} pushed to SQS ===`);
+
   return {
-    message: "Successfully fetched and pushed jobs to SQS",
-    query,
+    message: "Fetch jobs completed",
+    source: event.source || "manual",
     location,
-    totalFound: jobs.length,
-    pushedToSQS: pushedCount,
+    totalQueries: queries.length,
+    totalFound,
+    totalPushed,
+    results,
   };
 };
