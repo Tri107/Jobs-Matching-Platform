@@ -133,6 +133,50 @@ Resources:
         Variables:
           JOBS_TABLE: !Ref JobsTable
 
+# Cognito Auth
+  AuthUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectName}-user-pool-${StageName}"
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+
+  AuthUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${ProjectName}-web-client-${StageName}"
+      UserPoolId: !Ref AuthUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
 
 Outputs:
   RawJobsQueueUrl:
@@ -143,4 +187,13 @@ Outputs:
     Value: !GetAtt RawJobsQueue.Arn
   FetchJobsFunction:
     Description: "Fetch Jobs Lambda Function ARN"
-    Value: !GetAtt FetchJobsFunction.Arn
+    Value: !GetAtt FetchJobsFunction.Arn    
+  CognitoUserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref AuthUserPool
+  CognitoUserPoolClientId:
+    Description: "Cognito User Pool App Client ID"
+    Value: !Ref AuthUserPoolClient
+  CognitoRegion:
+    Description: "AWS Region for Cognito"
+    Value: !Ref AWS::Region
