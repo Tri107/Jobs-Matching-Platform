@@ -1,5 +1,9 @@
+"use client";
+
+import { type FormEvent, useState } from "react";
 import Link from "next/link";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { loginWithEmail } from "@/features/auth/services/cognitoAuthService";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin", "vietnamese"],
@@ -60,6 +64,28 @@ const stats = [
 ];
 
 export function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setError("");
+    setIsLoading(true);
+
+    try {
+      await loginWithEmail(email, password);
+      alert("Login success");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <main
       className={`${plusJakartaSans.className} min-h-screen bg-[radial-gradient(circle_at_top,_#f8fbff,_#ecf2ff_55%,_#e3ebff)] px-4 py-6 text-slate-900 sm:px-6 lg:px-10 lg:py-8`}
@@ -90,8 +116,6 @@ export function LoginForm() {
               </div>
               <div className="absolute bottom-0 left-1/2 h-[255px] w-[160px] -translate-x-1/2 rounded-t-[80px] bg-[linear-gradient(180deg,rgba(255,255,255,0.22),rgba(255,255,255,0.08))]" />
               <div className="absolute bottom-16 left-1/2 h-[110px] w-[110px] -translate-x-1/2 rounded-full border border-cyan-100/40 bg-[radial-gradient(circle,_rgba(102,231,255,0.45),_rgba(31,70,154,0.06)_60%,_transparent_72%)] shadow-[0_0_50px_rgba(82,244,255,0.35)]" />
-              
-              
             </div>
           </div>
 
@@ -125,7 +149,7 @@ export function LoginForm() {
               </Link>
             </div>
 
-            <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <label className="block">
                 <span className="mb-2 block text-xs font-medium text-slate-500">
                   Email
@@ -133,6 +157,8 @@ export function LoginForm() {
                 <span className="flex h-12 items-center rounded-xl border border-slate-200 px-4 shadow-[0_2px_6px_rgba(15,23,42,0.03)] transition focus-within:border-[#2d64ef]">
                   <input
                     type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
                     placeholder="email@example.com"
                     className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
                   />
@@ -149,6 +175,8 @@ export function LoginForm() {
                 <span className="flex h-12 items-center rounded-xl border border-slate-200 px-4 shadow-[0_2px_6px_rgba(15,23,42,0.03)] transition focus-within:border-[#2d64ef]">
                   <input
                     type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="••••••••"
                     className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
                   />
@@ -157,27 +185,34 @@ export function LoginForm() {
                   </span>
                 </span>
               </label>
-            </div>
 
-            <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Ghi nhớ tôi
-              </label>
-              <a href="#" className="font-medium text-[#2d64ef] hover:text-[#214fc9]">
-                Quên mật khẩu?
-              </a>
-            </div>
+              <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Ghi nhớ tôi
+                </label>
+                <a href="#" className="font-medium text-[#2d64ef] hover:text-[#214fc9]">
+                  Quên mật khẩu?
+                </a>
+              </div>
 
-            <button
-              type="button"
-              className="mt-5 h-12 w-full rounded-xl bg-[linear-gradient(180deg,#3f74f6,#2f63e8)] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,99,232,0.28)] transition hover:brightness-105"
-            >
-              Đăng nhập ngay
-            </button>
+              {error && (
+                <p className="mt-3 text-sm font-medium text-red-500">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="mt-5 h-12 w-full rounded-xl bg-[linear-gradient(180deg,#3f74f6,#2f63e8)] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,99,232,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isLoading ? "Đang đăng nhập..." : "Đăng nhập ngay"}
+              </button>
+            </form>
 
             <div className="my-7 flex items-center gap-3 text-xs text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
@@ -187,6 +222,7 @@ export function LoginForm() {
 
             <button
               type="button"
+              onClick={() => alert("Google login will be added later")}
               className="flex h-16 w-full items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-white px-6 text-[1.05rem] font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50"
             >
               <GoogleIcon />
