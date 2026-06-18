@@ -1,0 +1,98 @@
+import type { MatchingResult } from '@/types/matching';
+
+/**
+ * Mock matching history data
+ * TODO: Replace with AWS API Gateway endpoint GET /matching
+ */
+export const mockMatchingResults: MatchingResult[] = [
+  {
+    id: 'match-1',
+    jobId: 'job-23',
+    jobTitle: 'Senior Product Designer',
+    cvFileName: 'CV_Software_Engineer.pdf',
+    matchScore: 88,
+    matchedAt: '2026-06-15',
+    status: 'completed',
+  },
+  {
+    id: 'match-2',
+    jobId: 'job-2',
+    jobTitle: 'Backend Developer (Node.js)',
+    cvFileName: 'Le_Van_B_CV.pdf',
+    matchScore: 72,
+    matchedAt: '2026-06-14',
+    status: 'completed',
+  },
+  {
+    id: 'match-3',
+    jobId: 'job-9',
+    jobTitle: 'Marketing Manager',
+    cvFileName: 'Marketing_Expert_CV.pdf',
+    matchScore: 45,
+    matchedAt: '2026-06-12',
+    status: 'completed',
+  },
+  {
+    id: 'match-4',
+    jobId: 'job-1',
+    jobTitle: 'Senior Frontend Developer',
+    cvFileName: 'CV_Frontend_Dev.pdf',
+    matchScore: 92,
+    matchedAt: '2026-06-11',
+    status: 'completed',
+  },
+  {
+    id: 'match-5',
+    jobId: 'job-16',
+    jobTitle: 'DevOps Engineer',
+    cvFileName: 'DevOps_Resume.pdf',
+    matchScore: 85,
+    matchedAt: '2026-06-10',
+    status: 'completed',
+  },
+  {
+    id: 'match-6',
+    jobId: 'job-18',
+    jobTitle: 'Full-stack Developer (Python/React)',
+    cvFileName: 'Fullstack_CV.pdf',
+    matchScore: 90,
+    matchedAt: '2026-06-09',
+    status: 'completed',
+  },
+  {
+    id: 'match-7',
+    jobId: 'job-20',
+    jobTitle: 'AI/ML Engineer',
+    cvFileName: 'ML_Engineer_CV.pdf',
+    matchScore: 67,
+    matchedAt: '2026-06-08',
+    status: 'completed',
+  },
+  {
+    id: 'match-8',
+    jobId: 'job-24',
+    jobTitle: 'Blockchain Developer',
+    cvFileName: 'Blockchain_Dev_CV.pdf',
+    matchScore: 55,
+    matchedAt: '2026-06-07',
+    status: 'completed',
+  },
+  {
+    id: 'match-9',
+    jobId: 'job-27',
+    jobTitle: 'Cloud Solutions Architect',
+    cvFileName: 'Cloud_Architect_CV.pdf',
+    matchScore: 78,
+    matchedAt: '2026-06-06',
+    status: 'completed',
+  },
+  {
+    id: 'match-10',
+    jobId: 'job-8',
+    jobTitle: 'Lập Trình Viên Java (Senior)',
+    cvFileName: 'Java_Developer_CV.pdf',
+    matchScore: 70,
+    matchedAt: '2026-06-05',
+    status: 'completed',
+  },
+];
