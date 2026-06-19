@@ -1,5 +1,10 @@
+"use client";
+
+import { type FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { registerWithEmail } from "@/features/auth/services/cognitoAuthService";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin", "vietnamese"],
@@ -42,6 +47,37 @@ const benefits = [
 ];
 
 export function RegisterForm() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await registerWithEmail(email, password);
+      router.push(`/confirm-signup?email=${encodeURIComponent(email)}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Register failed";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <main
       className={`${plusJakartaSans.className} min-h-screen bg-[radial-gradient(circle_at_top,_#f8fbff,_#ecf2ff_55%,_#e3ebff)] px-4 py-6 text-slate-900 sm:px-6 lg:px-10 lg:py-8`}
@@ -106,15 +142,15 @@ export function RegisterForm() {
               </Link>
             </div>
 
-            <div className="space-y-4">
-              
-
+            <form onSubmit={handleSubmit} className="space-y-4">
               <label className="block">
                 <span className="mb-2 block text-xs font-medium text-slate-500">
                   Email
                 </span>
                 <input
                   type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="email@example.com"
                   className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm shadow-[0_2px_6px_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 focus:border-[#2d64ef]"
                 />
@@ -127,6 +163,8 @@ export function RegisterForm() {
                   </span>
                   <input
                     type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="Nhập mật khẩu"
                     className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm shadow-[0_2px_6px_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 focus:border-[#2d64ef]"
                   />
@@ -138,41 +176,53 @@ export function RegisterForm() {
                   </span>
                   <input
                     type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
                     placeholder="Nhập lại mật khẩu"
                     className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm shadow-[0_2px_6px_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 focus:border-[#2d64ef]"
                   />
                 </label>
               </div>
-            </div>
 
-            <div className="mt-5 rounded-2xl border border-[#dbe5ff] bg-[#f6f9ff] p-4">
-              <p className="text-sm font-semibold text-slate-800">
-                Tạo tài khoản để nhận:
-              </p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                {benefits.map((benefit) => (
-                  <li key={benefit} className="flex items-start gap-2">
-                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#2d64ef]" />
-                    <span>{benefit}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <div className="mt-5 rounded-2xl border border-[#dbe5ff] bg-[#f6f9ff] p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  Tạo tài khoản để nhận:
+                </p>
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                  {benefits.map((benefit) => (
+                    <li key={benefit} className="flex items-start gap-2">
+                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#2d64ef]" />
+                      <span>{benefit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <label className="mt-5 flex items-start gap-3 text-sm text-slate-500">
-              <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300" />
-              <span>
-                Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật của AI
-                Match.
-              </span>
-            </label>
+              <label className="mt-5 flex items-start gap-3 text-sm text-slate-500">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-slate-300"
+                />
+                <span>
+                  Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật của AI
+                  Match.
+                </span>
+              </label>
 
-            <button
-              type="button"
-              className="mt-5 h-12 w-full rounded-xl bg-[linear-gradient(180deg,#3f74f6,#2f63e8)] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,99,232,0.28)] transition hover:brightness-105"
-            >
-              Tạo tài khoản
-            </button>
+              {error && (
+                <p className="mt-3 text-sm font-medium text-red-500">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="mt-5 h-12 w-full rounded-xl bg-[linear-gradient(180deg,#3f74f6,#2f63e8)] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,99,232,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isLoading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+              </button>
+            </form>
 
             <div className="my-7 flex items-center gap-3 text-xs text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
@@ -182,6 +232,7 @@ export function RegisterForm() {
 
             <button
               type="button"
+              onClick={() => alert("Google login will be added later")}
               className="flex h-16 w-full items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-white px-6 text-[1.05rem] font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50"
             >
               <GoogleIcon />
