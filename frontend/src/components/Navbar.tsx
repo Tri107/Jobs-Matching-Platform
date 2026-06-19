@@ -40,11 +40,10 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive
+                className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive
                     ? 'text-blue-600'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 {link.label}
                 {isActive && (
@@ -107,11 +106,10 @@ export function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`block rounded-lg px-3 py-2.5 text-sm font-medium ${
-                  isActive
+                className={`block rounded-lg px-3 py-2.5 text-sm font-medium ${isActive
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {link.label}
               </Link>

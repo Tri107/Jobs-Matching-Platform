@@ -15,7 +15,7 @@ export interface MockNotification {
 export const mockNotifications: MockNotification[] = [
   {
     id: 'notif-1',
-    title: 'Kết quả matching mới',
+    title: 'Kết quả đánh giá mới',
     message: 'CV của bạn phù hợp 92% với vị trí Senior Frontend Developer tại Techcombank.',
     read: false,
     createdAt: '2026-06-18T10:30:00',
@@ -32,7 +32,7 @@ export const mockNotifications: MockNotification[] = [
   {
     id: 'notif-3',
     title: 'Cập nhật hệ thống',
-    message: 'Tính năng AI Matching đã được nâng cấp với độ chính xác cao hơn.',
+    message: 'Tính năng Đánh giá AI đã được nâng cấp với độ chính xác cao hơn.',
     read: true,
     createdAt: '2026-06-16T09:00:00',
     type: 'system',

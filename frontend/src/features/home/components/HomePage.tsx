@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
 import { JobList } from '@/features/jobs/components/JobList';
 import { JobSearchBar } from '@/features/jobs/components/JobSearchBar';
 import { Pagination } from '@/components/Pagination';
@@ -13,7 +11,7 @@ import type { Job } from '@/types/job';
 import { PAGINATION } from '@/lib/constants';
 import { HiChevronLeft, HiChevronRight, HiArrowRight } from 'react-icons/hi2';
 
-export default function HomePage() {
+export function HomePage() {
   const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,7 +35,6 @@ export default function HomePage() {
   }, [currentPage, loadJobs]);
 
   const handleSearch = (params: { keyword: string; location: string; salaryMin: number; salaryMax: number }) => {
-    // Navigate to jobs page with search params
     const searchParams = new URLSearchParams();
     if (params.keyword) searchParams.set('keyword', params.keyword);
     if (params.location && params.location !== 'Tất cả địa điểm') searchParams.set('location', params.location);
@@ -45,9 +42,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar />
-
+    <>
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 px-4 py-16 text-white lg:py-20">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.15),_transparent_50%)]" />
@@ -126,8 +121,6 @@ export default function HomePage() {
           />
         </div>
       </section>
-
-      <Footer />
-    </div>
+    </>
   );
 }

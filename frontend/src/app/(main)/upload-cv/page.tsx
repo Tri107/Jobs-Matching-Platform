@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { HiOutlineCloudArrowUp, HiOutlineDocument, HiOutlineXMark, HiOutlineCheckCircle } from 'react-icons/hi2';
+import { 
+  HiOutlineCloudArrowUp, 
+  HiOutlineDocument, 
+  HiOutlineXMark, 
+  HiOutlineCheckCircle,
+  HiOutlineDocumentText,
+  HiOutlineCpuChip,
+  HiOutlineSparkles 
+} from 'react-icons/hi2';
 
 interface UploadedFile {
   name: string;
@@ -23,14 +31,14 @@ export default function UploadCVPage() {
   };
 
   const handleFile = useCallback((file: File) => {
-    if (file.type === 'application/pdf' || file.name.endsWith('.pdf') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
       setUploadedFile({
         name: file.name,
         size: file.size,
         type: file.type,
       });
     } else {
-      alert('Chỉ hỗ trợ file PDF, DOC, DOCX');
+      alert('Chỉ hỗ trợ file PDF');
     }
   }, []);
 
@@ -75,7 +83,7 @@ export default function UploadCVPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Phân tích CV</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Upload CV của bạn để hệ thống AI phân tích và đánh giá độ phù hợp với
+          Tải lên CV của bạn để hệ thống AI phân tích và đánh giá độ phù hợp với
           các vị trí tuyển dụng.
         </p>
       </div>
@@ -85,16 +93,15 @@ export default function UploadCVPage() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`relative rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
-          isDragOver
+        className={`relative rounded-2xl border-2 border-dashed p-12 text-center transition-all ${isDragOver
             ? 'border-blue-400 bg-blue-50'
             : 'border-slate-200 bg-white hover:border-blue-300'
-        }`}
+          }`}
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.doc,.docx"
+          accept=".pdf"
           onChange={handleInputChange}
           className="hidden"
           id="cv-upload"
@@ -102,14 +109,12 @@ export default function UploadCVPage() {
 
         <div className="flex flex-col items-center">
           <div
-            className={`flex h-16 w-16 items-center justify-center rounded-2xl transition-colors ${
-              isDragOver ? 'bg-blue-100' : 'bg-slate-50'
-            }`}
+            className={`flex h-16 w-16 items-center justify-center rounded-2xl transition-colors ${isDragOver ? 'bg-blue-100' : 'bg-slate-50'
+              }`}
           >
             <HiOutlineCloudArrowUp
-              className={`h-8 w-8 ${
-                isDragOver ? 'text-blue-500' : 'text-slate-400'
-              }`}
+              className={`h-8 w-8 ${isDragOver ? 'text-blue-500' : 'text-slate-400'
+                }`}
             />
           </div>
 
@@ -129,7 +134,7 @@ export default function UploadCVPage() {
           </button>
 
           <p className="mt-4 text-xs text-slate-400">
-            Hỗ trợ định dạng: PDF, DOC, DOCX • Tối đa 10MB
+            Hỗ trợ định dạng: PDF • Tối đa 10MB
           </p>
         </div>
       </div>
@@ -172,11 +177,12 @@ export default function UploadCVPage() {
             type="button"
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:from-blue-700 hover:to-blue-800"
           >
-            🤖 Bắt đầu phân tích CV
+            <HiOutlineCpuChip className="h-5 w-5" />
+            Bắt đầu phân tích CV
           </button>
           <p className="mt-3 text-center text-xs text-slate-400">
             * Tính năng đang trong giai đoạn phát triển. Kết quả sẽ hiện thị
-            tại trang Lịch sử Matching.
+            tại trang Lịch sử đánh giá.
           </p>
         </div>
       )}
@@ -185,18 +191,18 @@ export default function UploadCVPage() {
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           {
-            icon: '📄',
-            title: 'Upload CV',
-            desc: 'Tải lên CV ở định dạng PDF hoặc Word',
+            icon: <HiOutlineDocumentText className="mx-auto h-8 w-8 text-blue-500" />,
+            title: 'Tải lên CV',
+            desc: 'Tải lên CV ở định dạng PDF',
           },
           {
-            icon: '🤖',
-            title: 'AI Phân tích',
+            icon: <HiOutlineCpuChip className="mx-auto h-8 w-8 text-blue-500" />,
+            title: 'Phân tích bằng AI',
             desc: 'Hệ thống AI trích xuất kỹ năng và kinh nghiệm',
           },
           {
-            icon: '🎯',
-            title: 'Matching Score',
+            icon: <HiOutlineSparkles className="mx-auto h-8 w-8 text-blue-500" />,
+            title: 'Điểm phù hợp',
             desc: 'Nhận điểm số phù hợp với từng vị trí',
           },
         ].map((item) => (
@@ -204,7 +210,7 @@ export default function UploadCVPage() {
             key={item.title}
             className="rounded-xl border border-slate-200 bg-white p-4 text-center"
           >
-            <div className="text-2xl">{item.icon}</div>
+            <div className="flex justify-center mb-2">{item.icon}</div>
             <p className="mt-2 text-sm font-semibold text-slate-900">
               {item.title}
             </p>

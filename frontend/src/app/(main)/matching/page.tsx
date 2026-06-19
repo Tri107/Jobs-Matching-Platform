@@ -6,7 +6,7 @@ import { mockMatchingResults } from '@/mock/matching';
 import { MatchProgressBar } from '@/features/jobs/components/MatchBadge';
 import { formatDate } from '@/features/jobs/utils/formatDate';
 import { Pagination } from '@/components/Pagination';
-import { HiOutlineFunnel, HiOutlineArrowDownTray, HiOutlineDocumentText } from 'react-icons/hi2';
+import { HiOutlineFunnel, HiOutlineDocumentText } from 'react-icons/hi2';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -21,7 +21,7 @@ export default function MatchingPage() {
     <div className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Lịch sử Matching</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Lịch sử đánh giá</h1>
         <p className="mt-1 text-sm text-slate-500">
           Quản lý và xem lại các phân tích CV đã thực hiện bằng AI.
         </p>
@@ -33,10 +33,10 @@ export default function MatchingPage() {
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div className="flex items-center gap-3">
             <h3 className="text-base font-bold text-slate-900">
-              Danh sách Matching
+              Danh sách đánh giá
             </h3>
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-              Tổng lượt Matching: {mockMatchingResults.length}
+              Tổng lượt đánh giá: {mockMatchingResults.length}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -46,13 +46,6 @@ export default function MatchingPage() {
             >
               <HiOutlineFunnel className="h-4 w-4" />
               Bộ lọc
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-            >
-              <HiOutlineArrowDownTray className="h-4 w-4" />
-              Xuất báo cáo
             </button>
           </div>
         </div>
@@ -65,7 +58,7 @@ export default function MatchingPage() {
                 <th className="px-6 py-3">Ngày</th>
                 <th className="px-6 py-3">Tên Job</th>
                 <th className="px-6 py-3">CV</th>
-                <th className="px-6 py-3">Match Score</th>
+                <th className="px-6 py-3">Điểm phù hợp</th>
                 <th className="px-6 py-3 text-right">Hành động</th>
               </tr>
             </thead>

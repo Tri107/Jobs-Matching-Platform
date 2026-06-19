@@ -2,6 +2,7 @@
 
 import type { Job } from '@/types/job';
 import { JobCard } from './JobCard';
+import { HiOutlineMagnifyingGlass } from 'react-icons/hi2';
 
 interface JobListProps {
   jobs: Job[];
@@ -27,7 +28,9 @@ export function JobList({
   if (jobs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-16 text-center">
-        <div className="text-5xl">🔍</div>
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+          <HiOutlineMagnifyingGlass className="h-10 w-10 text-slate-400" />
+        </div>
         <p className="mt-4 text-base font-semibold text-slate-700">{emptyMessage}</p>
         <p className="mt-1 text-sm text-slate-500">
           Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm

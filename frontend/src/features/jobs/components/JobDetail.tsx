@@ -15,6 +15,7 @@ import {
   HiHeart,
   HiArrowLeft,
   HiOutlineDocumentArrowUp,
+  HiOutlineFaceFrown,
 } from 'react-icons/hi2';
 
 interface JobDetailProps {
@@ -47,7 +48,9 @@ export function JobDetail({ jobId }: JobDetailProps) {
   if (!job) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="text-5xl">😔</div>
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+          <HiOutlineFaceFrown className="h-10 w-10 text-slate-400" />
+        </div>
         <p className="mt-4 text-lg font-semibold text-slate-700">
           Không tìm thấy công việc này
         </p>
@@ -78,9 +81,6 @@ export function JobDetail({ jobId }: JobDetailProps) {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             {/* Header */}
             <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-3xl">
-                {job.logo}
-              </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900">{job.title}</h1>
                 <p className="mt-1 text-base font-medium text-blue-600">
@@ -114,8 +114,8 @@ export function JobDetail({ jobId }: JobDetailProps) {
                 {job.experience === 'under-1'
                   ? 'Dưới 1 năm'
                   : job.experience === '5+'
-                  ? '5+ năm kinh nghiệm'
-                  : `${job.experience} năm kinh nghiệm`}
+                    ? '5+ năm kinh nghiệm'
+                    : `${job.experience} năm kinh nghiệm`}
               </span>
               <MatchBadge score={job.matchScore} size="md" />
             </div>
@@ -182,11 +182,10 @@ export function JobDetail({ jobId }: JobDetailProps) {
             <button
               type="button"
               onClick={() => job && toggleFavorite(job)}
-              className={`mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-all ${
-                isFavorite
+              className={`mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-all ${isFavorite
                   ? 'border-red-200 bg-red-50 text-red-500'
                   : 'border-slate-200 text-slate-700 hover:border-blue-200 hover:text-blue-600'
-              }`}
+                }`}
             >
               {isFavorite ? (
                 <HiHeart className="h-5 w-5" />

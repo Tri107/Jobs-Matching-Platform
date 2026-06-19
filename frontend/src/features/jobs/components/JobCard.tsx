@@ -21,11 +21,6 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
 
   return (
     <div className="group relative flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-blue-200 hover:shadow-md">
-      {/* Logo */}
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-2xl">
-        {job.logo}
-      </div>
-
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -51,11 +46,10 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
             <button
               type="button"
               onClick={() => onToggleFavorite(job)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                isFavorite
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${isFavorite
                   ? 'border-red-200 bg-red-50 text-red-500'
                   : 'border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-400'
-              }`}
+                }`}
             >
               {isFavorite ? (
                 <HiHeart className="h-4 w-4" />
@@ -109,11 +103,8 @@ function JobCardGrid({ job, isFavorite, onToggleFavorite }: Omit<JobCardProps, '
         </div>
       )}
 
-      {/* Logo + Title */}
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xl">
-          {job.logo}
-        </div>
+      {/* Title */}
+      <div className="flex items-start gap-3 w-full">
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/${job.id}`}

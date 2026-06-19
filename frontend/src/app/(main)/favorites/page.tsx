@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { JobList } from '@/features/jobs/components/JobList';
 import { useFavoritesStore } from '@/features/jobs/hooks/useFavorites';
+import { HiOutlineHeart } from 'react-icons/hi2';
 
 export default function FavoritesPage() {
   const { favoriteJobs, favoriteIds, loading, fetchFavorites, toggleFavorite } =
@@ -24,7 +25,9 @@ export default function FavoritesPage() {
 
       {favoriteJobs.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-20 text-center">
-          <div className="text-5xl">💖</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+            <HiOutlineHeart className="h-10 w-10 text-slate-400" />
+          </div>
           <p className="mt-4 text-base font-semibold text-slate-700">
             Chưa có việc làm yêu thích
           </p>
