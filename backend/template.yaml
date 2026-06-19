@@ -30,6 +30,32 @@ Globals:
         STAGE: !Ref StageName
 
 Resources:
+# API Gateway
+  BackendHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+      CorsConfiguration:
+        AllowOrigins:
+          - http://localhost:3000
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        MaxAge: 600
+      Auth:
+        Authorizers:
+          CognitoJwtAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${AuthUserPool}"
+              audience:
+                - !Ref AuthUserPoolClient
+
 # SQS Queues
   RawJobsDLQ:
     Type: AWS::SQS::Queue
@@ -69,6 +95,60 @@ Resources:
             ProjectionType: ALL
 
 # Lambda Functions
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-health-check-${StageName}"
+      CodeUri: .
+      Handler: src/functions/health/handler.handler
+      Description: Public health check endpoint for API Gateway
+      Events:
+        HealthCheckApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /health
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/health/handler.ts
+          
+  GetJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-get-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/jobs/getJobs.handler
+      Description: Public endpoint to list jobs from DynamoDB
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+      Events:
+        GetJobsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /jobs
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/jobs/getJobs.ts
+
   FetchJobsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -225,3 +305,6 @@ Outputs:
   CognitoRegion:
     Description: "AWS Region for Cognito"
     Value: !Ref AWS::Region
+  ApiGatewayUrl:
+    Description: "HTTP API Gateway base URL"
+    Value: !Sub "https://${BackendHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
