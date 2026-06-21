@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { HiOutlineBell, HiOutlineBars3, HiOutlineXMark } from 'react-icons/hi2';
+import { useLogout } from '@/features/auth/hooks/useLogout';
 import { mockCurrentUser } from '@/mock/users';
 import { mockNotifications } from '@/mock/notifications';
 
@@ -17,6 +18,7 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isLoggingOut, logoutError, handleLogout } = useLogout();
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
 
   return (
@@ -79,6 +81,15 @@ export function Navbar() {
             </span>
           </div>
 
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="hidden rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 md:inline-flex"
+          >
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
+          </button>
+
           {/* Mobile menu toggle */}
           <button
             type="button"
@@ -123,6 +134,19 @@ export function Navbar() {
               {mockCurrentUser.name}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
+          </button>
+          {logoutError && (
+            <p className="mt-2 text-sm font-medium text-red-500">
+              {logoutError}
+            </p>
+          )}
         </nav>
       )}
     </header>
