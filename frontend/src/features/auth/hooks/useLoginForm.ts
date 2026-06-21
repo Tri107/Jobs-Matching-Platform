@@ -1,10 +1,13 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { loginWithEmail } from "@/features/auth/services/cognitoAuthService";
 
 export function useLoginForm() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +22,7 @@ export function useLoginForm() {
     try {
       await loginWithEmail(email, password);
       alert("Login success");
+      router.push("/");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);
