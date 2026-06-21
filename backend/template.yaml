@@ -109,6 +109,37 @@ Resources:
           KeyType: HASH
         - AttributeName: jobId
           KeyType: RANGE
+# S3 Buckets
+  CvBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-cvs-${StageName}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - "*"
+            MaxAge: 3000
+
+  CvBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CvBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${CvBucket}/*"
 
 # Lambda Functions
   HealthCheckFunction:
@@ -276,6 +307,35 @@ Resources:
           Properties:
             ApiId: !Ref BackendHttpApi
             Path: /saved-jobs/{jobId}
+  ManageCvFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-manage-cv-${StageName}"
+      CodeUri: .
+      Handler: src/functions/manageCv/handler.handler
+      Description: Protected endpoint to manage user CVs (Upload, Get, Delete)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource: !GetAtt CvBucket.Arn
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+                - s3:HeadObject
+              Resource: !Sub "${CvBucket.Arn}/*"
+      Environment:
+        Variables:
+          CV_BUCKET_NAME: !Ref CvBucket
+      Events:
+        UploadCvApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/upload
             Method: POST
             PayloadFormatVersion: "2.0"
             Auth:
@@ -295,6 +355,21 @@ Resources:
             ApiId: !Ref BackendHttpApi
             Path: /saved-jobs
             Method: GET
+        GetCvsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        DeleteCvApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/{filename}
+            Method: DELETE
             PayloadFormatVersion: "2.0"
             Auth:
               Authorizer: CognitoJwtAuthorizer
@@ -306,6 +381,7 @@ Resources:
         Sourcemap: true
         EntryPoints:
           - src/functions/savedJobs/handler.ts
+          - src/functions/manageCv/handler.ts
 
 # Cognito Auth
   AuthUserPool:
@@ -377,3 +453,9 @@ Outputs:
   SavedJobsTableName:
     Description: "Saved Jobs DynamoDB Table Name"
     Value: !Ref SavedJobsTable
+  CvBucketName:
+    Description: "CV S3 Bucket Name"
+    Value: !Ref CvBucket
+  CvBucketArn:
+    Description: "CV S3 Bucket ARN"
+    Value: !GetAtt CvBucket.Arn
