@@ -94,6 +94,21 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  SavedJobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-saved-jobs-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: jobId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: jobId
+          KeyType: RANGE
 # S3 Buckets
   CvBucket:
     Type: AWS::S3::Bucket
@@ -273,6 +288,55 @@ Resources:
         Variables:
           JOBS_TABLE: !Ref JobsTable
 
+  SavedJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-saved-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/savedJobs/handler.handler
+      Description: Manage user saved/favorite jobs (save, unsave, list)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SavedJobsTable
+      Environment:
+        Variables:
+          SAVED_JOBS_TABLE: !Ref SavedJobsTable
+      Events:
+        SaveJobApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /saved-jobs/{jobId}
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        UnsaveJobApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /saved-jobs/{jobId}
+            Method: DELETE
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        GetSavedJobsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /saved-jobs
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/savedJobs/handler.ts
   ManageCvFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -400,6 +464,9 @@ Outputs:
   ApiGatewayUrl:
     Description: "HTTP API Gateway base URL"
     Value: !Sub "https://${BackendHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+  SavedJobsTableName:
+    Description: "Saved Jobs DynamoDB Table Name"
+    Value: !Ref SavedJobsTable
   CvBucketName:
     Description: "CV S3 Bucket Name"
     Value: !Ref CvBucket
