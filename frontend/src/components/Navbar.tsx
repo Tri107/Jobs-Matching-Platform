@@ -2,14 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { HiOutlineBell, HiOutlineBars3, HiOutlineXMark } from 'react-icons/hi2';
+import { useState, useRef, useEffect } from 'react';
+import {
+  HiOutlineBell,
+  HiOutlineBars3,
+  HiOutlineXMark,
+  HiOutlineUserCircle,
+  HiOutlineArrowRightOnRectangle,
+  HiOutlineChevronDown,
+} from 'react-icons/hi2';
 import { mockCurrentUser } from '@/mock/users';
 import { mockNotifications } from '@/mock/notifications';
 
 const navLinks = [
   { label: 'Tìm việc làm', href: '/jobs' },
-  { label: 'Phân tích CV', href: '/upload-cv' },
+  { label: 'Phân tích CV', href: '/cv-analysis' },
   { label: 'Lịch sử', href: '/matching' },
   { label: 'Yêu thích', href: '/favorites' },
 ];
@@ -17,7 +24,23 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md">
@@ -69,14 +92,48 @@ export function Navbar() {
             )}
           </button>
 
-          {/* User */}
-          <div className="hidden items-center gap-2 md:flex">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
-              {mockCurrentUser.name.charAt(0)}
-            </div>
-            <span className="text-sm font-medium text-slate-700">
-              {mockCurrentUser.name}
-            </span>
+          {/* User dropdown — Desktop */}
+          <div className="relative hidden md:block" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-slate-50"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+                {mockCurrentUser.name.charAt(0)}
+              </div>
+              <span className="text-sm font-medium text-slate-700">
+                {mockCurrentUser.name}
+              </span>
+              <HiOutlineChevronDown
+                className={`h-4 w-4 text-slate-400 transition-transform ${
+                  userMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {/* Dropdown menu */}
+            {userMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 animate-fadeIn rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl shadow-slate-200/50">
+                <Link
+                  href="/profile"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-blue-600"
+                >
+                  <HiOutlineUserCircle className="h-5 w-5 text-slate-400" />
+                  Hồ sơ cá nhân
+                </Link>
+                <div className="my-1 border-t border-slate-100" />
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
+                >
+                  <HiOutlineArrowRightOnRectangle className="h-5 w-5" />
+                  Đăng xuất
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Mobile menu toggle */}
@@ -115,13 +172,24 @@ export function Navbar() {
               </Link>
             );
           })}
-          <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
-              {mockCurrentUser.name.charAt(0)}
-            </div>
-            <span className="text-sm font-medium text-slate-700">
-              {mockCurrentUser.name}
-            </span>
+          <div className="mt-2 border-t border-slate-100 pt-3">
+            <Link
+              href="/profile"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+                {mockCurrentUser.name.charAt(0)}
+              </div>
+              <span>{mockCurrentUser.name}</span>
+            </Link>
+            <button
+              type="button"
+              className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50"
+            >
+              <HiOutlineArrowRightOnRectangle className="h-5 w-5" />
+              Đăng xuất
+            </button>
           </div>
         </nav>
       )}

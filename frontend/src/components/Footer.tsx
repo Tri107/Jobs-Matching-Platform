@@ -14,9 +14,9 @@ const footerColumns = [
     title: 'Dành cho Ứng viên',
     links: [
       { label: 'Tìm việc làm', href: '/jobs' },
-      { label: 'Tạo CV online', href: '/upload-cv' },
-      { label: 'Cẩm nang nghề nghiệp', href: '#' },
-      { label: 'Kiểm tra lương', href: '#' },
+      { label: 'Tải lên CV', href: '/upload-cv' },
+      { label: 'Phân tích CV AI', href: '/cv-analysis' },
+      { label: 'Hồ sơ cá nhân', href: '/profile' },
     ],
   },
   {
