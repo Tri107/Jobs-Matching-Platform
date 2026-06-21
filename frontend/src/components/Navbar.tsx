@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { HiOutlineBell, HiOutlineBars3, HiOutlineXMark } from 'react-icons/hi2';
+import { useCurrentUserEmail } from '@/features/auth/hooks/useCurrentUserEmail';
 import { useLogout } from '@/features/auth/hooks/useLogout';
-import { mockCurrentUser } from '@/mock/users';
 import { mockNotifications } from '@/mock/notifications';
 
 const navLinks = [
@@ -18,8 +18,10 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { userEmail } = useCurrentUserEmail();
   const { isLoggingOut, logoutError, handleLogout } = useLogout();
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const userInitial = userEmail.charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md">
@@ -72,14 +74,16 @@ export function Navbar() {
           </button>
 
           {/* User */}
-          <div className="hidden items-center gap-2 md:flex">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
-              {mockCurrentUser.name.charAt(0)}
+          {userEmail && (
+            <div className="hidden items-center gap-2 md:flex">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+                {userInitial}
+              </div>
+              <span className="max-w-48 truncate text-sm font-medium text-slate-700">
+                {userEmail}
+              </span>
             </div>
-            <span className="text-sm font-medium text-slate-700">
-              {mockCurrentUser.name}
-            </span>
-          </div>
+          )}
 
           <button
             type="button"
@@ -126,14 +130,16 @@ export function Navbar() {
               </Link>
             );
           })}
-          <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
-              {mockCurrentUser.name.charAt(0)}
+          {userEmail && (
+            <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+                {userInitial}
+              </div>
+              <span className="truncate text-sm font-medium text-slate-700">
+                {userEmail}
+              </span>
             </div>
-            <span className="text-sm font-medium text-slate-700">
-              {mockCurrentUser.name}
-            </span>
-          </div>
+          )}
           <button
             type="button"
             onClick={handleLogout}
