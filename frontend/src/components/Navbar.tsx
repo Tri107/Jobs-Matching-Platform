@@ -11,8 +11,6 @@ import {
   HiOutlineArrowRightOnRectangle,
   HiOutlineChevronDown,
 } from "react-icons/hi2";
-import { useState } from "react";
-import { HiOutlineBell, HiOutlineBars3, HiOutlineXMark } from "react-icons/hi2";
 import { useCurrentUserEmail } from "@/features/auth/hooks/useCurrentUserEmail";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { mockNotifications } from "@/mock/notifications";
