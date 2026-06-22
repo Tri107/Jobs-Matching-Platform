@@ -16,6 +16,20 @@ Parameters:
     Description: API Key for SerpAPI (Google Jobs) - stored in SSM Parameter Store
     Default: /jobs-matching/dev/serpapi-key
 
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth Client ID for Cognito Google identity provider
+
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Google OAuth Client Secret for Cognito Google identity provider
+
+  CognitoDomainPrefix:
+    Type: String
+    Default: jobs-matching-auth-dev
+    Description: Cognito Hosted UI domain prefix
+
 Globals:
   Function:
     Runtime: nodejs24.x
@@ -423,8 +437,32 @@ Resources:
           Required: true
           Mutable: true
 
+  AuthUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref AuthUserPool
+
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "openid email profile"
+      AttributeMapping:
+        email: email
+        given_name: given_name
+        family_name: family_name
+        name: name
+
   AuthUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
+    DependsOn:
+      - GoogleIdentityProvider
     Properties:
       ClientName: !Sub "${ProjectName}-web-client-${StageName}"
       UserPoolId: !Ref AuthUserPool
@@ -441,6 +479,20 @@ Resources:
         AccessToken: hours
         IdToken: hours
         RefreshToken: days
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
+      CallbackURLs:
+        - http://localhost:3000/auth/callback
+      LogoutURLs:
+        - http://localhost:3000/login
 
 Outputs:
   RawJobsQueueUrl:
@@ -461,6 +513,15 @@ Outputs:
   CognitoRegion:
     Description: "AWS Region for Cognito"
     Value: !Ref AWS::Region
+  CognitoHostedUIDomain:
+    Description: "Cognito Hosted UI domain"
+    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+  CognitoOAuthCallbackUrl:
+    Description: "Local OAuth callback URL"
+    Value: "http://localhost:3000/auth/callback"
+  CognitoOAuthLogoutUrl:
+    Description: "Local OAuth logout URL"
+    Value: "http://localhost:3000/login"
   ApiGatewayUrl:
     Description: "HTTP API Gateway base URL"
     Value: !Sub "https://${BackendHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"

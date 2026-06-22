@@ -20,6 +20,22 @@ export function configureAmplify() {
       Cognito: {
         userPoolId,
         userPoolClientId,
+        loginWith: {
+          email: true,
+          oauth: {
+            domain: process.env.NEXT_PUBLIC_COGNITO_DOMAIN ?? "",
+            scopes: ["openid", "email", "profile"],
+            redirectSignIn: [
+              process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN ??
+                "http://localhost:3000/auth/callback",
+            ],
+            redirectSignOut: [
+              process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT ??
+                "http://localhost:3000/login",
+            ],
+            responseType: "code",
+          },
+        },
       },
     },
   });

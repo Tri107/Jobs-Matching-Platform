@@ -5,11 +5,17 @@ import {
   signOut,
   getCurrentUser,
   fetchAuthSession,
+  fetchUserAttributes,
   resetPassword,
   confirmResetPassword,
+  signInWithRedirect,
 } from "aws-amplify/auth";
 
 import { configureAmplify } from "@/lib/amplifyClient";
+
+function getStringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
 
 export async function registerWithEmail(email: string, password: string) {
   configureAmplify();
@@ -40,6 +46,14 @@ export async function loginWithEmail(email: string, password: string) {
   return signIn({
     username: email,
     password,
+  });
+}
+
+export async function loginWithGoogle() {
+  configureAmplify();
+
+  return signInWithRedirect({
+    provider: "Google",
   });
 }
 
@@ -75,6 +89,43 @@ export async function getAuthUser() {
   configureAmplify();
 
   return getCurrentUser();
+}
+
+export async function getAuthUserDisplayName() {
+  configureAmplify();
+
+  const user = await getCurrentUser();
+  let attributes: Awaited<ReturnType<typeof fetchUserAttributes>> = {};
+  let idTokenPayload: Record<string, unknown> = {};
+
+  try {
+    attributes = await fetchUserAttributes();
+  } catch {
+    attributes = {};
+  }
+
+  try {
+    const session = await fetchAuthSession();
+    idTokenPayload = session.tokens?.idToken?.payload ?? {};
+  } catch {
+    idTokenPayload = {};
+  }
+
+  const loginId = user.signInDetails?.loginId ?? "";
+  const username = user.username ?? "";
+  const emailUsername = username.includes("@") ? username : "";
+  const federatedUsername = username ? username.replace(/^[^_]+_/, "") : "";
+
+  return (
+    attributes.name ||
+    attributes.email ||
+    getStringValue(idTokenPayload.name) ||
+    getStringValue(idTokenPayload.email) ||
+    loginId ||
+    emailUsername ||
+    federatedUsername ||
+    "Tài khoản"
+  );
 }
 
 export async function getIdToken() {

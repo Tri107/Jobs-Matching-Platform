@@ -3,7 +3,10 @@
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { loginWithEmail } from "@/features/auth/services/cognitoAuthService";
+import {
+  loginWithEmail,
+  loginWithGoogle,
+} from "@/features/auth/services/cognitoAuthService";
 
 export function useLoginForm() {
   const router = useRouter();
@@ -31,6 +34,20 @@ export function useLoginForm() {
     }
   }
 
+  async function handleGoogleLogin() {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google login failed";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return {
     email,
     password,
@@ -39,5 +56,6 @@ export function useLoginForm() {
     setEmail,
     setPassword,
     handleSubmit,
+    handleGoogleLogin,
   };
 }

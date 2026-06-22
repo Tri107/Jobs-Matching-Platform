@@ -24,6 +24,7 @@ export function LoginForm() {
     setEmail,
     setPassword,
     handleSubmit,
+    handleGoogleLogin,
   } = useLoginForm();
 
   return (
@@ -123,11 +124,12 @@ export function LoginForm() {
 
             <button
               type="button"
-              onClick={() => alert("Google login will be added later")}
-              className="flex h-16 w-full items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-white px-6 text-[1.05rem] font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50"
+              disabled={isLoading}
+              onClick={handleGoogleLogin}
+              className="flex h-16 w-full items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-white px-6 text-[1.05rem] font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
             >
               <GoogleIcon />
-              <span>Tiếp tục với Google</span>
+              <span>Đăng nhập với Google</span>
             </button>
 
             <div className="mt-8 text-center text-xs text-slate-400">
