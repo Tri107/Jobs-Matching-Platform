@@ -92,9 +92,12 @@ export function LoginForm() {
                   />
                   Lưu tài khoản
                 </label>
-                <a href="#" className="font-medium text-[#2d64ef] hover:text-[#214fc9]">
+                <Link
+                  href="/forgot-password"
+                  className="font-medium text-[#2d64ef] hover:text-[#214fc9]"
+                >
                   Quên mật khẩu?
-                </a>
+                </Link>
               </div>
 
               {error && (
