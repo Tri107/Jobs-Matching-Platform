@@ -5,6 +5,8 @@ import {
   signOut,
   getCurrentUser,
   fetchAuthSession,
+  resetPassword,
+  confirmResetPassword,
 } from "aws-amplify/auth";
 
 import { configureAmplify } from "@/lib/amplifyClient";
@@ -38,6 +40,28 @@ export async function loginWithEmail(email: string, password: string) {
   return signIn({
     username: email,
     password,
+  });
+}
+
+export async function requestPasswordReset(email: string) {
+  configureAmplify();
+
+  return resetPassword({
+    username: email,
+  });
+}
+
+export async function confirmPasswordReset(
+  email: string,
+  code: string,
+  newPassword: string
+) {
+  configureAmplify();
+
+  return confirmResetPassword({
+    username: email,
+    confirmationCode: code,
+    newPassword,
   });
 }
 
