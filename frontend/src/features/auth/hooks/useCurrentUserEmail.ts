@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { getAuthUser } from "@/features/auth/services/cognitoAuthService";
+import { getAuthUserDisplayName } from "@/features/auth/services/cognitoAuthService";
 
 export function useCurrentUserEmail() {
   const [userEmail, setUserEmail] = useState("");
@@ -12,12 +12,10 @@ export function useCurrentUserEmail() {
 
     async function loadCurrentUserEmail() {
       try {
-        const user = await getAuthUser();
-        const loginId = user.signInDetails?.loginId ?? "";
-        const username = user.username.includes("@") ? user.username : "";
+        const displayName = await getAuthUserDisplayName();
 
         if (isMounted) {
-          setUserEmail(loginId || username);
+          setUserEmail(displayName);
         }
       } catch {
         if (isMounted) {
