@@ -4,11 +4,46 @@
 
 import type { Job, JobSearchParams, JobFilterParams } from '@/types/job';
 import type { PaginatedResponse } from '@/types/common';
-import { mockJobs } from '@/mock/jobs';
 import { PAGINATION } from '@/lib/constants';
+import { getIdToken } from '@/features/auth/services/cognitoAuthService';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+export interface DynamoJobItem {
+  jobId?: string;
+  id?: string;
+  originalTitle?: string;
+  title?: string;
+  companyName?: string;
+  company_name?: string;
+  company?: string;
+  location?: string;
+  salaryMin?: number | string;
+  salaryMax?: number | string;
+  experience?: string;
+  workType?: string;
+  scheduleType?: string;
+  skills?: string[] | string;
+  description?: string;
+  requirements?: string[] | string;
+  benefits?: string[] | string;
+  matchScore?: number | string;
+  postedAt?: string;
+  createdAt?: string;
+  saved?: boolean;
+  logo?: string;
+}
 
 // Helper to map DynamoDB attributes to frontend Job interface
-function mapDynamoJobToFrontendJob(item: any): Job {
+function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
+  const getWorkType = (): Job['workType'] => {
+    const rawType = item.workType || (item.scheduleType === 'Toàn thời gian' ? 'Fulltime' : 'Hybrid');
+    if (rawType === 'Fulltime' || rawType === 'Part-time' || rawType === 'Remote' || rawType === 'Hybrid') {
+      return rawType;
+    }
+    return 'Fulltime';
+  };
+
   return {
     id: item.jobId || item.id || '',
     title: item.originalTitle || item.title || 'Unknown Title',
@@ -17,7 +52,7 @@ function mapDynamoJobToFrontendJob(item: any): Job {
     salaryMin: item.salaryMin !== undefined ? Number(item.salaryMin) : 0,
     salaryMax: item.salaryMax !== undefined ? Number(item.salaryMax) : 0,
     experience: item.experience || 'under-1',
-    workType: (item.workType || (item.scheduleType === 'Toàn thời gian' ? 'Fulltime' : 'Hybrid')) as any,
+    workType: getWorkType(),
     skills: Array.isArray(item.skills) ? item.skills : (item.skills ? [item.skills] : []),
     description: item.description || '',
     requirements: Array.isArray(item.requirements) ? item.requirements : (item.requirements ? [item.requirements] : []),
@@ -38,8 +73,10 @@ export async function getJobs(
   sortBy: 'matchScore' | 'postedAt' | 'salaryMax' = 'matchScore'
 ): Promise<PaginatedResponse<Job>> {
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://38icub30ig.execute-api.ap-southeast-1.amazonaws.com/dev';
-    const response = await fetch(`${apiBase}/jobs?limit=${limit}`);
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+    const response = await fetch(`${API_BASE_URL}/jobs?limit=${limit}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -54,23 +91,13 @@ export async function getJobs(
       totalPages: Math.ceil((result.count || items.length) / limit),
     };
   } catch (error) {
-    console.error("Failed to fetch jobs from API, falling back to mock", error);
-    const sorted = [...mockJobs].sort((a, b) => {
-      if (sortBy === 'matchScore') return b.matchScore - a.matchScore;
-      if (sortBy === 'salaryMax') return b.salaryMax - a.salaryMax;
-      return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
-    });
-
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const data = sorted.slice(start, end);
-
+    console.error("Failed to fetch jobs from API", error);
     return {
-      data,
-      total: mockJobs.length,
+      data: [],
+      total: 0,
       page,
       limit,
-      totalPages: Math.ceil(mockJobs.length / limit),
+      totalPages: 0,
     };
   }
 }
@@ -80,26 +107,20 @@ export async function getJobs(
  */
 export async function getJobById(id: string): Promise<Job | null> {
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://38icub30ig.execute-api.ap-southeast-1.amazonaws.com/dev';
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
     
-    // Fetch from the list endpoint /jobs (which has CORS configured and works)
-    // and find the matching job on the client side to avoid CORS blocks on unmapped routes.
-    const response = await fetch(`${apiBase}/jobs?limit=100`);
+    const response = await fetch(`${API_BASE_URL}/jobs/${id}`);
     if (response.ok) {
-      const result = await response.json();
-      const items = result.items || [];
-      const matchedItem = items.find((item: any) => item.jobId === id || item.id === id);
-      if (matchedItem) {
-        return mapDynamoJobToFrontendJob(matchedItem);
-      }
+      const item: DynamoJobItem = await response.json();
+      return mapDynamoJobToFrontendJob(item);
     }
   } catch (error) {
-    console.error("Failed to fetch job detail from API, falling back to mock", error);
+    console.error("Failed to fetch job detail from API", error);
   }
   
-  // Fallback to mock data if not found
-  const job = mockJobs.find((j) => j.id === id) ?? null;
-  return job;
+  return null;
 }
 
 /**
@@ -111,9 +132,11 @@ export async function searchJobs(
   sortBy: 'matchScore' | 'postedAt' | 'salaryMax' = 'matchScore'
 ): Promise<PaginatedResponse<Job>> {
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://38icub30ig.execute-api.ap-southeast-1.amazonaws.com/dev';
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
     const limit = searchParams.limit ?? PAGINATION.DEFAULT_LIMIT;
-    let url = `${apiBase}/jobs?limit=${limit}`;
+    let url = `${API_BASE_URL}/jobs?limit=${limit}`;
     if (searchParams.keyword) {
       url += `&keyword=${encodeURIComponent(searchParams.keyword)}`;
     }
@@ -132,105 +155,134 @@ export async function searchJobs(
       totalPages: Math.ceil((result.count || items.length) / limit),
     };
   } catch (error) {
-    console.error("Failed to search jobs from API, falling back to mock", error);
-    let filtered = [...mockJobs];
-
-    // Apply search
-    if (searchParams.keyword) {
-      const kw = searchParams.keyword.toLowerCase();
-      filtered = filtered.filter(
-        (job) =>
-          job.title.toLowerCase().includes(kw) ||
-          job.company.toLowerCase().includes(kw) ||
-          job.skills.some((s) => s.toLowerCase().includes(kw))
-      );
-    }
-
-    if (searchParams.location && searchParams.location !== 'Tất cả địa điểm') {
-      filtered = filtered.filter((job) => job.location === searchParams.location);
-    }
-
-    if (searchParams.salaryMin !== undefined) {
-      filtered = filtered.filter((job) => job.salaryMax >= (searchParams.salaryMin ?? 0));
-    }
-
-    if (searchParams.salaryMax !== undefined && searchParams.salaryMax !== Infinity) {
-      filtered = filtered.filter((job) => job.salaryMin <= (searchParams.salaryMax ?? Infinity));
-    }
-
-    // Apply filters
-    if (filterParams.experience && filterParams.experience.length > 0) {
-      filtered = filtered.filter((job) =>
-        filterParams.experience!.includes(job.experience)
-      );
-    }
-
-    if (filterParams.skills && filterParams.skills.length > 0) {
-      filtered = filtered.filter((job) =>
-        job.skills.some((s) => filterParams.skills!.includes(s))
-      );
-    }
-
-    if (filterParams.workType && filterParams.workType.length > 0) {
-      filtered = filtered.filter((job) =>
-        filterParams.workType!.includes(job.workType)
-      );
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      if (sortBy === 'matchScore') return b.matchScore - a.matchScore;
-      if (sortBy === 'salaryMax') return b.salaryMax - a.salaryMax;
-      return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
-    });
-
-    const page = searchParams.page ?? PAGINATION.DEFAULT_PAGE;
-    const limit = searchParams.limit ?? PAGINATION.DEFAULT_LIMIT;
-    const start = (page - 1) * limit;
-    const end = start + limit;
-
+    console.error("Failed to search jobs from API", error);
     return {
-      data: filtered.slice(start, end),
-      total: filtered.length,
-      page,
-      limit,
-      totalPages: Math.ceil(filtered.length / limit),
+      data: [],
+      total: 0,
+      page: searchParams.page ?? 1,
+      limit: searchParams.limit ?? PAGINATION.DEFAULT_LIMIT,
+      totalPages: 0,
     };
   }
 }
 
 /**
- * Save a job to favorites
+ * Save a job to favorites via API
  */
 export async function saveJob(jobId: string): Promise<{ success: boolean }> {
-  const job = mockJobs.find((j) => j.id === jobId);
-  if (job) job.saved = true;
-  return { success: true };
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      throw new Error('User is not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/saved-jobs/${jobId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save job: ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save job via API", error);
+    return { success: false };
+  }
 }
 
 /**
- * Remove a job from favorites
+ * Remove a job from favorites via API
  */
 export async function removeSavedJob(jobId: string): Promise<{ success: boolean }> {
-  const job = mockJobs.find((j) => j.id === jobId);
-  if (job) job.saved = false;
-  return { success: true };
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      throw new Error('User is not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/saved-jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to remove saved job: ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to remove saved job via API", error);
+    return { success: false };
+  }
 }
 
 /**
- * Get all saved/favorite jobs
+ * Get all saved/favorite jobs from API
  */
 export async function getFavoriteJobs(): Promise<Job[]> {
-  const favorites = mockJobs.filter((j) => j.saved);
-  return favorites;
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      return [];
+    }
+
+    const response = await fetch(`${API_BASE_URL}/saved-jobs`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch saved jobs: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const savedItems = result.items || [];
+    const savedJobIds = new Set<string>(savedItems.map((item: { jobId: string }) => item.jobId));
+
+    if (savedJobIds.size === 0) {
+      return [];
+    }
+
+    // Now fetch jobs list to populate the job details
+    const jobsResponse = await getJobs(1, 50); // get standard first 50 jobs
+    const favoriteJobs = jobsResponse.data.filter(job => savedJobIds.has(job.id));
+    
+    // Mark them as saved
+    return favoriteJobs.map(job => ({ ...job, saved: true }));
+  } catch (error) {
+    console.error("Failed to get favorite jobs from API", error);
+    return [];
+  }
 }
 
 /**
- * Get AI-matched jobs (sorted by matchScore desc)
+ * Get AI-matched jobs (sorted by matchScore desc) using API
  */
 export async function getMatchingJobs(): Promise<Job[]> {
-  const matched = [...mockJobs]
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, 20);
-  return matched;
+  try {
+    const jobsRes = await getJobs(1, 50, 'matchScore');
+    return jobsRes.data.slice(0, 20);
+  } catch (error) {
+    console.error("Failed to get matching jobs", error);
+    return [];
+  }
 }
