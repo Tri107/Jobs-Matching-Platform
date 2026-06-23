@@ -47,8 +47,8 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
               type="button"
               onClick={() => onToggleFavorite(job)}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${isFavorite
-                  ? 'border-red-200 bg-red-50 text-red-500'
-                  : 'border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-400'
+                ? 'border-red-200 bg-red-50 text-red-500'
+                : 'border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-400'
                 }`}
             >
               {isFavorite ? (
@@ -116,10 +116,7 @@ function JobCardGrid({ job, isFavorite, onToggleFavorite }: Omit<JobCardProps, '
         </div>
       </div>
 
-      {/* Salary */}
-      <p className="mt-3 text-xs font-semibold text-blue-600">
-        {formatSalaryRange(job.salaryMin, job.salaryMax)}
-      </p>
+
 
       {/* Location */}
       <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">

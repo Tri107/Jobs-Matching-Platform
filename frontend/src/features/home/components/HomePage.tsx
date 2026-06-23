@@ -4,35 +4,30 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { JobList } from '@/features/jobs/components/JobList';
 import { JobSearchBar } from '@/features/jobs/components/JobSearchBar';
-import { Pagination } from '@/components/Pagination';
 import { useFavoritesStore } from '@/features/jobs/hooks/useFavorites';
 import { getJobs } from '@/features/jobs/services/jobApi';
 import type { Job } from '@/types/job';
-import { PAGINATION } from '@/lib/constants';
-import { HiChevronLeft, HiChevronRight, HiArrowRight } from 'react-icons/hi2';
+import { HiArrowRight } from 'react-icons/hi2';
 
 export function HomePage() {
   const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
   const { favoriteIds, toggleFavorite, fetchFavorites } = useFavoritesStore();
 
   useEffect(() => {
     fetchFavorites();
   }, [fetchFavorites]);
 
-  const loadJobs = useCallback(async (page: number) => {
+  const loadJobs = useCallback(async () => {
     setLoading(true);
-    const result = await getJobs(page, PAGINATION.HOME_LIMIT, 'matchScore');
+    const result = await getJobs(1, 12, 'matchScore');
     setFeaturedJobs(result.data);
-    setTotalPages(result.totalPages);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadJobs(currentPage);
-  }, [currentPage, loadJobs]);
+    loadJobs();
+  }, [loadJobs]);
 
   const handleSearch = (params: { keyword: string; location: string; salaryMin: number; salaryMax: number }) => {
     const searchParams = new URLSearchParams();
@@ -75,26 +70,10 @@ export function HomePage() {
               Gợi ý thông minh dựa trên hồ sơ và kỹ năng của bạn
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
-            >
-              <HiChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
-            >
-              <HiChevronRight className="h-4 w-4" />
-            </button>
+          <div>
             <Link
               href="/jobs"
-              className="ml-4 hidden items-center gap-1 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700 sm:flex"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
             >
               Xem tất cả
               <HiArrowRight className="h-4 w-4" />
@@ -109,15 +88,6 @@ export function HomePage() {
             favoriteIds={favoriteIds}
             onToggleFavorite={toggleFavorite}
             variant="grid"
-          />
-        </div>
-
-        {/* Pagination */}
-        <div className="mt-8 flex justify-center">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
           />
         </div>
       </section>
