@@ -10,6 +10,7 @@ export interface RawJob {
   extensions?: string[];
   source_link?: string;
   description?: string;
+  thumbnail?: string;
 }
 
 export interface Job {
@@ -25,6 +26,7 @@ export interface Job {
   sourceLink: string;
   description: string;
   createdAt: string;
+  thumbnail?: string;
 }
 
 export interface NormalizeMatchResult {

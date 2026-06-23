@@ -52,6 +52,7 @@ def lambda_handler(event, context):
         
     source_link = event.get("source_link", "")
     description = event.get("description", "")
+    thumbnail = event.get("thumbnail") or ""
     
     # 2. Normalization
     normalized_title = normalize_title(original_title)
@@ -101,6 +102,7 @@ def lambda_handler(event, context):
         "scheduleType": original_schedule_type or "",
         "sourceLink": source_link,
         "description": description,
+        "thumbnail": thumbnail,
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     }
     
