@@ -2,37 +2,13 @@
  * API service for Jobs feature integrated with AWS API Gateway & DynamoDB
  */
 
-import type { Job, JobSearchParams, JobFilterParams } from '@/types/job';
+import type { Job, JobSearchParams, JobFilterParams, DynamoJobItem } from '@/types/job';
 import type { PaginatedResponse } from '@/types/common';
 import { PAGINATION } from '@/lib/constants';
 import { getIdToken } from '@/features/auth/services/cognitoAuthService';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
-export interface DynamoJobItem {
-  jobId?: string;
-  id?: string;
-  originalTitle?: string;
-  title?: string;
-  companyName?: string;
-  company_name?: string;
-  company?: string;
-  location?: string;
-  salaryMin?: number | string;
-  salaryMax?: number | string;
-  experience?: string;
-  workType?: string;
-  scheduleType?: string;
-  skills?: string[] | string;
-  description?: string;
-  requirements?: string[] | string;
-  benefits?: string[] | string;
-  matchScore?: number | string;
-  postedAt?: string;
-  createdAt?: string;
-  saved?: boolean;
-  logo?: string;
-}
 
 // Helper to map DynamoDB attributes to frontend Job interface
 function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
