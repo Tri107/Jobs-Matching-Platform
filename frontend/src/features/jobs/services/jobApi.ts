@@ -9,6 +9,15 @@ import { getIdToken } from '@/features/auth/services/cognitoAuthService';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
+async function getRequiredIdToken(): Promise<SavedJobResult & { token?: string }> {
+  try {
+    const token = await getIdToken();
+    return token ? { success: true, token } : { success: false, requiresAuth: true };
+  } catch {
+    return { success: false, requiresAuth: true };
+  }
+}
+
 
 // Helper to map DynamoDB attributes to frontend Job interface
 function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
@@ -143,28 +152,36 @@ export async function searchJobs(
   }
 }
 
+export type SavedJobResult = {
+  success: boolean;
+  requiresAuth?: boolean;
+};
+
 /**
  * Save a job to favorites via API
  */
-export async function saveJob(jobId: string): Promise<{ success: boolean }> {
+export async function saveJob(jobId: string): Promise<SavedJobResult> {
   try {
     if (!API_BASE_URL) {
       throw new Error('API Base URL is not configured');
     }
 
-    const token = await getIdToken();
-    if (!token) {
-      throw new Error('User is not authenticated');
+    const auth = await getRequiredIdToken();
+    if (!auth.success || !auth.token) {
+      return auth;
     }
 
     const response = await fetch(`${API_BASE_URL}/saved-jobs/${jobId}`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${auth.token}`,
       },
     });
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return { success: false, requiresAuth: true };
+      }
       throw new Error(`Failed to save job: ${response.status}`);
     }
 
@@ -178,25 +195,28 @@ export async function saveJob(jobId: string): Promise<{ success: boolean }> {
 /**
  * Remove a job from favorites via API
  */
-export async function removeSavedJob(jobId: string): Promise<{ success: boolean }> {
+export async function removeSavedJob(jobId: string): Promise<SavedJobResult> {
   try {
     if (!API_BASE_URL) {
       throw new Error('API Base URL is not configured');
     }
 
-    const token = await getIdToken();
-    if (!token) {
-      throw new Error('User is not authenticated');
+    const auth = await getRequiredIdToken();
+    if (!auth.success || !auth.token) {
+      return auth;
     }
 
     const response = await fetch(`${API_BASE_URL}/saved-jobs/${jobId}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${auth.token}`,
       },
     });
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return { success: false, requiresAuth: true };
+      }
       throw new Error(`Failed to remove saved job: ${response.status}`);
     }
 
