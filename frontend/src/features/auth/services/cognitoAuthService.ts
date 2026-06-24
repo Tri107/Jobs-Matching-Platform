@@ -9,6 +9,7 @@ import {
   resetPassword,
   confirmResetPassword,
   signInWithRedirect,
+  updateUserAttributes,
 } from "aws-amplify/auth";
 
 import { configureAmplify } from "@/lib/amplifyClient";
@@ -126,6 +127,52 @@ export async function getAuthUserDisplayName() {
     federatedUsername ||
     "Tài khoản"
   );
+}
+
+export type AuthUserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+};
+
+export async function getAuthUserProfile(): Promise<AuthUserProfile> {
+  configureAmplify();
+
+  const user = await getCurrentUser();
+  const attributes = await fetchUserAttributes();
+  const loginId = user.signInDetails?.loginId ?? "";
+  const username = user.username ?? "";
+  const email =
+    attributes.email ||
+    loginId ||
+    (username.includes("@") ? username : "");
+
+  return {
+    id: user.userId || username,
+    name: attributes.name || email || username || "Tài khoản",
+    email,
+    phone: attributes.phone_number || "",
+  };
+}
+
+export async function updateAuthUserProfile(profile: {
+  name: string;
+  phone?: string;
+}) {
+  configureAmplify();
+
+  const userAttributes: Record<string, string> = {
+    name: profile.name,
+  };
+
+  if (profile.phone) {
+    userAttributes.phone_number = profile.phone;
+  }
+
+  return updateUserAttributes({
+    userAttributes,
+  });
 }
 
 export async function getIdToken() {
