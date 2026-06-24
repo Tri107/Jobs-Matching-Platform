@@ -81,11 +81,16 @@ export function JobDetail({ jobId }: JobDetailProps) {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             {/* Header */}
             <div className="flex items-start gap-4">
-              <div>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-3xl overflow-hidden">
+                {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
+                  <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
+                ) : (
+                  <span>{job.logo || '💻'}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
                 <h1 className="text-xl font-bold text-slate-900">{job.title}</h1>
-                <p className="mt-1 text-base font-medium text-blue-600">
-                  {formatSalaryRange(job.salaryMin, job.salaryMax)}
-                </p>
+
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
                   <span className="flex items-center gap-1">
                     <HiOutlineBriefcase className="h-4 w-4" />
@@ -123,49 +128,55 @@ export function JobDetail({ jobId }: JobDetailProps) {
             {/* Description */}
             <div className="mt-8">
               <h2 className="text-base font-bold text-slate-900">Mô tả công việc</h2>
-              <p className="mt-3 leading-7 text-slate-600">{job.description}</p>
+              <p className="mt-3 leading-7 text-slate-600 whitespace-pre-wrap">{job.description}</p>
             </div>
 
             {/* Requirements */}
-            <div className="mt-8">
-              <h2 className="text-base font-bold text-slate-900">Yêu cầu công việc</h2>
-              <ul className="mt-3 space-y-2">
-                {job.requirements.map((req, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-600">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                    <span className="leading-6">{req}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {job.requirements && job.requirements.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-base font-bold text-slate-900">Yêu cầu công việc</h2>
+                <ul className="mt-3 space-y-2">
+                  {job.requirements.map((req, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-600">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                      <span className="leading-6">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Benefits */}
-            <div className="mt-8">
-              <h2 className="text-base font-bold text-slate-900">Quyền lợi</h2>
-              <ul className="mt-3 space-y-2">
-                {job.benefits.map((benefit, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-600">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                    <span className="leading-6">{benefit}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {job.benefits && job.benefits.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-base font-bold text-slate-900">Quyền lợi</h2>
+                <ul className="mt-3 space-y-2">
+                  {job.benefits.map((benefit, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-600">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      <span className="leading-6">{benefit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Skills */}
-            <div className="mt-8">
-              <h2 className="text-base font-bold text-slate-900">Kỹ năng yêu cầu</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {job.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700"
-                  >
-                    {skill}
-                  </span>
-                ))}
+            {job.skills && job.skills.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-base font-bold text-slate-900">Kỹ năng yêu cầu</h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {job.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

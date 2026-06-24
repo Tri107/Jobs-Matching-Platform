@@ -1,169 +1,265 @@
 /**
- * Mock API service for Jobs feature
- * All functions simulate API calls with setTimeout
- * TODO: Replace with AWS API Gateway endpoints
+ * API service for Jobs feature integrated with AWS API Gateway & DynamoDB
  */
 
-import type { Job, JobSearchParams, JobFilterParams } from '@/types/job';
+import type { Job, JobSearchParams, JobFilterParams, DynamoJobItem } from '@/types/job';
 import type { PaginatedResponse } from '@/types/common';
-import { mockJobs } from '@/mock/jobs';
 import { PAGINATION } from '@/lib/constants';
+import { getIdToken } from '@/features/auth/services/cognitoAuthService';
 
-const MOCK_DELAY = 500;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
-function delay<T>(data: T, ms: number = MOCK_DELAY): Promise<T> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(data), ms);
-  });
+
+// Helper to map DynamoDB attributes to frontend Job interface
+function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
+  const getWorkType = (): Job['workType'] => {
+    const rawType = item.scheduleType;
+    if (rawType === 'Toàn thời gian' || rawType === 'Fulltime') return 'Fulltime';
+    if (rawType === 'Bán thời gian' || rawType === 'Part-time') return 'Part-time';
+    if (rawType === 'Làm việc từ xa' || rawType === 'Remote') return 'Remote';
+    if (rawType === 'Hybrid') return 'Hybrid';
+    return 'Fulltime';
+  };
+
+  return {
+    id: item.jobId || '',
+    title: item.originalTitle || item.title || 'Unknown Title',
+    company: item.companyName || 'Unknown Company',
+    location: item.location || 'Việt Nam',
+    salaryMin: 0,
+    salaryMax: 0,
+    experience: 'under-1',
+    workType: getWorkType(),
+    skills: [],
+    description: item.description || '',
+    requirements: [],
+    benefits: [],
+    matchScore: 0,
+    postedAt: item.postedAt || item.originalPostedAt || item.createdAt || new Date().toISOString(),
+    saved: false,
+    logo: item.thumbnail || '💻',
+  };
 }
 
 /**
- * Get paginated list of jobs
- * TODO: Replace with AWS API Gateway endpoint GET /jobs
+ * Get paginated list of jobs from DynamoDB
  */
 export async function getJobs(
   page: number = PAGINATION.DEFAULT_PAGE,
   limit: number = PAGINATION.DEFAULT_LIMIT,
   sortBy: 'matchScore' | 'postedAt' | 'salaryMax' = 'matchScore'
 ): Promise<PaginatedResponse<Job>> {
-  const sorted = [...mockJobs].sort((a, b) => {
-    if (sortBy === 'matchScore') return b.matchScore - a.matchScore;
-    if (sortBy === 'salaryMax') return b.salaryMax - a.salaryMax;
-    return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
-  });
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+    const response = await fetch(`${API_BASE_URL}/jobs?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    const items = (result.items || []).map(mapDynamoJobToFrontendJob);
 
-  const start = (page - 1) * limit;
-  const end = start + limit;
-  const data = sorted.slice(start, end);
-
-  return delay({
-    data,
-    total: mockJobs.length,
-    page,
-    limit,
-    totalPages: Math.ceil(mockJobs.length / limit),
-  });
+    return {
+      data: items,
+      total: result.count || items.length,
+      page,
+      limit,
+      totalPages: Math.ceil((result.count || items.length) / limit),
+    };
+  } catch (error) {
+    console.error("Failed to fetch jobs from API", error);
+    return {
+      data: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+    };
+  }
 }
 
 /**
- * Get single job by ID
- * TODO: Replace with AWS API Gateway endpoint GET /jobs/:id
+ * Get single job by ID from DynamoDB
  */
 export async function getJobById(id: string): Promise<Job | null> {
-  const job = mockJobs.find((j) => j.id === id) ?? null;
-  return delay(job);
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/jobs/${id}`);
+    if (response.ok) {
+      const item: DynamoJobItem = await response.json();
+      return mapDynamoJobToFrontendJob(item);
+    }
+  } catch (error) {
+    console.error("Failed to fetch job detail from API", error);
+  }
+
+  return null;
 }
 
 /**
- * Search and filter jobs
- * TODO: Replace with AWS API Gateway endpoint GET /jobs/search
+ * Search and filter jobs using API
  */
 export async function searchJobs(
   searchParams: JobSearchParams,
   filterParams: JobFilterParams,
   sortBy: 'matchScore' | 'postedAt' | 'salaryMax' = 'matchScore'
 ): Promise<PaginatedResponse<Job>> {
-  let filtered = [...mockJobs];
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+    const limit = searchParams.limit ?? PAGINATION.DEFAULT_LIMIT;
+    let url = `${API_BASE_URL}/jobs?limit=${limit}`;
+    if (searchParams.keyword) {
+      url += `&keyword=${encodeURIComponent(searchParams.keyword)}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    const items = (result.items || []).map(mapDynamoJobToFrontendJob);
 
-  // Apply search
-  if (searchParams.keyword) {
-    const kw = searchParams.keyword.toLowerCase();
-    filtered = filtered.filter(
-      (job) =>
-        job.title.toLowerCase().includes(kw) ||
-        job.company.toLowerCase().includes(kw) ||
-        job.skills.some((s) => s.toLowerCase().includes(kw))
-    );
+    return {
+      data: items,
+      total: result.count || items.length,
+      page: searchParams.page ?? 1,
+      limit,
+      totalPages: Math.ceil((result.count || items.length) / limit),
+    };
+  } catch (error) {
+    console.error("Failed to search jobs from API", error);
+    return {
+      data: [],
+      total: 0,
+      page: searchParams.page ?? 1,
+      limit: searchParams.limit ?? PAGINATION.DEFAULT_LIMIT,
+      totalPages: 0,
+    };
   }
-
-  if (searchParams.location && searchParams.location !== 'Tất cả địa điểm') {
-    filtered = filtered.filter((job) => job.location === searchParams.location);
-  }
-
-  if (searchParams.salaryMin !== undefined) {
-    filtered = filtered.filter((job) => job.salaryMax >= (searchParams.salaryMin ?? 0));
-  }
-
-  if (searchParams.salaryMax !== undefined && searchParams.salaryMax !== Infinity) {
-    filtered = filtered.filter((job) => job.salaryMin <= (searchParams.salaryMax ?? Infinity));
-  }
-
-  // Apply filters
-  if (filterParams.experience && filterParams.experience.length > 0) {
-    filtered = filtered.filter((job) =>
-      filterParams.experience!.includes(job.experience)
-    );
-  }
-
-  if (filterParams.skills && filterParams.skills.length > 0) {
-    filtered = filtered.filter((job) =>
-      job.skills.some((s) => filterParams.skills!.includes(s))
-    );
-  }
-
-  if (filterParams.workType && filterParams.workType.length > 0) {
-    filtered = filtered.filter((job) =>
-      filterParams.workType!.includes(job.workType)
-    );
-  }
-
-  // Sort
-  filtered.sort((a, b) => {
-    if (sortBy === 'matchScore') return b.matchScore - a.matchScore;
-    if (sortBy === 'salaryMax') return b.salaryMax - a.salaryMax;
-    return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
-  });
-
-  const page = searchParams.page ?? PAGINATION.DEFAULT_PAGE;
-  const limit = searchParams.limit ?? PAGINATION.DEFAULT_LIMIT;
-  const start = (page - 1) * limit;
-  const end = start + limit;
-
-  return delay({
-    data: filtered.slice(start, end),
-    total: filtered.length,
-    page,
-    limit,
-    totalPages: Math.ceil(filtered.length / limit),
-  });
 }
 
 /**
- * Save a job to favorites
- * TODO: Replace with AWS API Gateway endpoint POST /favorites
+ * Save a job to favorites via API
  */
 export async function saveJob(jobId: string): Promise<{ success: boolean }> {
-  const job = mockJobs.find((j) => j.id === jobId);
-  if (job) job.saved = true;
-  return delay({ success: true });
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      throw new Error('User is not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/saved-jobs/${jobId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save job: ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save job via API", error);
+    return { success: false };
+  }
 }
 
 /**
- * Remove a job from favorites
- * TODO: Replace with AWS API Gateway endpoint DELETE /favorites/:id
+ * Remove a job from favorites via API
  */
 export async function removeSavedJob(jobId: string): Promise<{ success: boolean }> {
-  const job = mockJobs.find((j) => j.id === jobId);
-  if (job) job.saved = false;
-  return delay({ success: true });
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      throw new Error('User is not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/saved-jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to remove saved job: ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to remove saved job via API", error);
+    return { success: false };
+  }
 }
 
 /**
- * Get all saved/favorite jobs
- * TODO: Replace with AWS API Gateway endpoint GET /favorites
+ * Get all saved/favorite jobs from API
  */
 export async function getFavoriteJobs(): Promise<Job[]> {
-  const favorites = mockJobs.filter((j) => j.saved);
-  return delay(favorites);
+  try {
+    if (!API_BASE_URL) {
+      throw new Error('API Base URL is not configured');
+    }
+
+    const token = await getIdToken();
+    if (!token) {
+      return [];
+    }
+
+    const response = await fetch(`${API_BASE_URL}/saved-jobs`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch saved jobs: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const savedItems = result.items || [];
+    const savedJobIds = new Set<string>(savedItems.map((item: { jobId: string }) => item.jobId));
+
+    if (savedJobIds.size === 0) {
+      return [];
+    }
+
+    // Now fetch jobs list to populate the job details
+    const jobsResponse = await getJobs(1, 50); // get standard first 50 jobs
+    const favoriteJobs = jobsResponse.data.filter(job => savedJobIds.has(job.id));
+
+    // Mark them as saved
+    return favoriteJobs.map(job => ({ ...job, saved: true }));
+  } catch (error) {
+    console.error("Failed to get favorite jobs from API", error);
+    return [];
+  }
 }
 
 /**
- * Get AI-matched jobs (sorted by matchScore desc)
- * TODO: Replace with AWS API Gateway endpoint GET /matching/jobs
+ * Get AI-matched jobs (sorted by matchScore desc) using API
  */
 export async function getMatchingJobs(): Promise<Job[]> {
-  const matched = [...mockJobs]
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, 20);
-  return delay(matched);
+  try {
+    const jobsRes = await getJobs(1, 50, 'matchScore');
+    return jobsRes.data.slice(0, 20);
+  } catch (error) {
+    console.error("Failed to get matching jobs", error);
+    return [];
+  }
 }
