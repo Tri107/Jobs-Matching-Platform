@@ -13,30 +13,31 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 // Helper to map DynamoDB attributes to frontend Job interface
 function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
   const getWorkType = (): Job['workType'] => {
-    const rawType = item.workType || (item.scheduleType === 'Toàn thời gian' ? 'Fulltime' : 'Hybrid');
-    if (rawType === 'Fulltime' || rawType === 'Part-time' || rawType === 'Remote' || rawType === 'Hybrid') {
-      return rawType;
-    }
+    const rawType = item.scheduleType;
+    if (rawType === 'Toàn thời gian' || rawType === 'Fulltime') return 'Fulltime';
+    if (rawType === 'Bán thời gian' || rawType === 'Part-time') return 'Part-time';
+    if (rawType === 'Làm việc từ xa' || rawType === 'Remote') return 'Remote';
+    if (rawType === 'Hybrid') return 'Hybrid';
     return 'Fulltime';
   };
 
   return {
-    id: item.jobId || item.id || '',
+    id: item.jobId || '',
     title: item.originalTitle || item.title || 'Unknown Title',
-    company: item.companyName || item.company_name || item.company || 'Unknown Company',
+    company: item.companyName || 'Unknown Company',
     location: item.location || 'Việt Nam',
-    salaryMin: item.salaryMin !== undefined ? Number(item.salaryMin) : 0,
-    salaryMax: item.salaryMax !== undefined ? Number(item.salaryMax) : 0,
-    experience: item.experience || 'under-1',
+    salaryMin: 0,
+    salaryMax: 0,
+    experience: 'under-1',
     workType: getWorkType(),
-    skills: Array.isArray(item.skills) ? item.skills : (item.skills ? [item.skills] : []),
+    skills: [],
     description: item.description || '',
-    requirements: Array.isArray(item.requirements) ? item.requirements : (item.requirements ? [item.requirements] : []),
-    benefits: Array.isArray(item.benefits) ? item.benefits : (item.benefits ? [item.benefits] : []),
-    matchScore: item.matchScore !== undefined ? Number(item.matchScore) : 0,
-    postedAt: item.postedAt || item.createdAt || new Date().toISOString(),
-    saved: !!item.saved,
-    logo: item.logo || '💻',
+    requirements: [],
+    benefits: [],
+    matchScore: 0,
+    postedAt: item.postedAt || item.originalPostedAt || item.createdAt || new Date().toISOString(),
+    saved: false,
+    logo: item.thumbnail || '💻',
   };
 }
 
@@ -86,7 +87,7 @@ export async function getJobById(id: string): Promise<Job | null> {
     if (!API_BASE_URL) {
       throw new Error('API Base URL is not configured');
     }
-    
+
     const response = await fetch(`${API_BASE_URL}/jobs/${id}`);
     if (response.ok) {
       const item: DynamoJobItem = await response.json();
@@ -95,7 +96,7 @@ export async function getJobById(id: string): Promise<Job | null> {
   } catch (error) {
     console.error("Failed to fetch job detail from API", error);
   }
-  
+
   return null;
 }
 
@@ -241,7 +242,7 @@ export async function getFavoriteJobs(): Promise<Job[]> {
     // Now fetch jobs list to populate the job details
     const jobsResponse = await getJobs(1, 50); // get standard first 50 jobs
     const favoriteJobs = jobsResponse.data.filter(job => savedJobIds.has(job.id));
-    
+
     // Mark them as saved
     return favoriteJobs.map(job => ({ ...job, saved: true }));
   } catch (error) {

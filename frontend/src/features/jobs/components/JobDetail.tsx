@@ -81,7 +81,14 @@ export function JobDetail({ jobId }: JobDetailProps) {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             {/* Header */}
             <div className="flex items-start gap-4">
-              <div>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-3xl overflow-hidden">
+                {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
+                  <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
+                ) : (
+                  <span>{job.logo || '💻'}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
                 <h1 className="text-xl font-bold text-slate-900">{job.title}</h1>
 
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
