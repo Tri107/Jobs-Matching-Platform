@@ -21,6 +21,15 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
 
   return (
     <div className="group relative flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-blue-200 hover:shadow-md">
+      {/* Logo */}
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-2xl overflow-hidden">
+        {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
+          <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
+        ) : (
+          <span>{job.logo || '💻'}</span>
+        )}
+      </div>
+
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -47,8 +56,8 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
               type="button"
               onClick={() => onToggleFavorite(job)}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${isFavorite
-                  ? 'border-red-200 bg-red-50 text-red-500'
-                  : 'border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-400'
+                ? 'border-red-200 bg-red-50 text-red-500'
+                : 'border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-400'
                 }`}
             >
               {isFavorite ? (
@@ -103,8 +112,15 @@ function JobCardGrid({ job, isFavorite, onToggleFavorite }: Omit<JobCardProps, '
         </div>
       )}
 
-      {/* Title */}
+      {/* Title & Logo */}
       <div className="flex items-start gap-3 w-full">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 border border-slate-100 text-xl overflow-hidden">
+          {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
+            <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
+          ) : (
+            <span>{job.logo || '💻'}</span>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/${job.id}`}
@@ -116,10 +132,7 @@ function JobCardGrid({ job, isFavorite, onToggleFavorite }: Omit<JobCardProps, '
         </div>
       </div>
 
-      {/* Salary */}
-      <p className="mt-3 text-xs font-semibold text-blue-600">
-        {formatSalaryRange(job.salaryMin, job.salaryMax)}
-      </p>
+
 
       {/* Location */}
       <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">

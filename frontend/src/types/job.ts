@@ -36,3 +36,19 @@ export interface JobFilterParams {
   skills?: string[];
   workType?: string[];
 }
+
+export interface DynamoJobItem {
+  jobId?: string;
+  companyName?: string;
+  createdAt?: string;
+  description?: string;
+  location?: string;
+  originalPostedAt?: string;
+  originalTitle?: string;
+  postedAt?: string;
+  scheduleType?: string;
+  sourceLink?: string;
+  thumbnail?: string;
+  title?: string;
+}
+
