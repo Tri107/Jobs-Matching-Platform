@@ -4,6 +4,12 @@ import { create } from 'zustand';
 import type { Job } from '@/types/job';
 import * as jobApi from '@/features/jobs/services/jobApi';
 
+function redirectToLogin() {
+  if (typeof window !== 'undefined') {
+    window.location.assign('/login');
+  }
+}
+
 interface FavoritesStore {
   // State
   favoriteIds: Set<string>;
@@ -39,22 +45,37 @@ export const useFavoritesStore = create<FavoritesStore>((set, get) => ({
     const { favoriteIds } = get();
     const isSaved = favoriteIds.has(job.id);
 
-    // Optimistic update
     const newIds = new Set(favoriteIds);
     if (isSaved) {
+      const result = await jobApi.removeSavedJob(job.id);
+      if (result.requiresAuth) {
+        redirectToLogin();
+        return;
+      }
+      if (!result.success) {
+        return;
+      }
+
       newIds.delete(job.id);
       set((state) => ({
         favoriteIds: newIds,
         favoriteJobs: state.favoriteJobs.filter((j) => j.id !== job.id),
       }));
-      await jobApi.removeSavedJob(job.id);
     } else {
+      const result = await jobApi.saveJob(job.id);
+      if (result.requiresAuth) {
+        redirectToLogin();
+        return;
+      }
+      if (!result.success) {
+        return;
+      }
+
       newIds.add(job.id);
       set((state) => ({
         favoriteIds: newIds,
         favoriteJobs: [...state.favoriteJobs, { ...job, saved: true }],
       }));
-      await jobApi.saveJob(job.id);
     }
   },
 
