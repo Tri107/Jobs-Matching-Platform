@@ -55,6 +55,7 @@ Resources:
         AllowHeaders:
           - Content-Type
           - Authorization
+          - x-original-filename
         AllowMethods:
           - GET
           - POST
