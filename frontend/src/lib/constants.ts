@@ -3,7 +3,7 @@
  */
 
 // TODO: Replace with AWS API Gateway endpoint
-export const API_BASE_URL = 'https://api.example.com';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 export const DEMO_USER_ID = 'demo-user-1';
 

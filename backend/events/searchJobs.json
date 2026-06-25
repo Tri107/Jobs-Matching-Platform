@@ -1,0 +1,16 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /jobs/search",
+  "rawPath": "/jobs/search",
+  "rawQueryString": "keyword=react&limit=10",
+  "queryStringParameters": {
+    "keyword": "react",
+    "limit": "10"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/jobs/search"
+    }
+  }
+}

@@ -8,18 +8,15 @@ import {
   HiOutlineTrash,
   HiOutlinePlusCircle,
   HiOutlineCheckBadge,
-} from "react-icons/hi2";
+  HiOutlineXMark,
+} from 'react-icons/hi2';
+import { getCVs, uploadCV, deleteCV } from '@/features/profile/services/cvApi';
+import type { CVItem } from '@/types/cv';
 import {
   getAuthUserProfile,
   updateAuthUserProfile,
   type AuthUserProfile,
 } from "@/features/auth/services/cognitoAuthService";
-import {
-  deleteUserCv,
-  getUserCvs,
-  uploadUserCv,
-  type UserCv,
-} from "@/features/profile/services/cvApi";
 
 const MAX_CVS = 3;
 
@@ -47,14 +44,12 @@ function formatUpdatedAt(value?: string): string {
 function getMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
-
-export default function ProfilePage() {
-  const router = useRouter();
+  export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const router = useRouter();
   const [profile, setProfile] = useState<AuthUserProfile | null>(null);
   const [name, setName] = useState("");
-  const [cvList, setCvList] = useState<UserCv[]>([]);
+  const [cvList, setCvList] = useState<CVItem[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -131,14 +126,36 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
+    async function loadCVs() {
+      try {
+        setIsLoading(true);
+        const data = await getCVs();
+        setCvList(data.items || []);
+      } catch (err: any) {
+        showNotification(` Lỗi tải danh sách CV: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadCVs();
+  }, []);
+
+  const extractFilename = (key: string): string => {
+    const parts = key.split('/');
+    return parts[parts.length - 1];
+  };
 
   const handleDeleteCV = async (key: string) => {
     try {
-      await deleteUserCv(key);
-      setCvList((prev) => prev.filter((cv) => cv.key !== key));
-      showNotification("Đã xóa CV thành công!");
-    } catch (error) {
-      showNotification(getMessage(error, "Không thể xóa CV."));
+      const filename = extractFilename(key);
+      showNotification(' Đang xóa CV...');
+      await deleteCV(filename);
+      showNotification(' Đã xóa CV thành công!');
+      
+      const data = await getCVs();
+      setCvList(data.items || []);
+    } catch (err: any) {
+      showNotification(` Lỗi xóa CV: ${err.message}`);
     }
   };
 
@@ -146,28 +163,35 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
-      showNotification("File không hợp lệ. Chỉ hỗ trợ định dạng PDF.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      showNotification(' File không hợp lệ! Chỉ hỗ trợ định dạng PDF.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification(' Kích thước file vượt quá giới hạn 5MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     if (cvList.length >= MAX_CVS) {
-      showNotification("Đã đạt giới hạn 3 CV. Vui lòng xóa bớt trước khi tải lên.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      showNotification(' Đã đạt giới hạn 3 CV. Vui lòng xóa bớt trước khi tải lên.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    setUploading(true);
     try {
-      const uploadedCv = await uploadUserCv(file);
-      setCvList((prev) => [...prev, uploadedCv]);
-      showNotification("Đã tải lên CV thành công!");
-    } catch (error) {
-      showNotification(getMessage(error, "Không thể tải CV lên."));
+      showNotification(' Đang tải CV lên...');
+      await uploadCV(file);
+      showNotification(' Đã tải lên CV thành công!');
+      
+      const data = await getCVs();
+      setCvList(data.items || []);
+    } catch (err: any) {
+      showNotification(` Lỗi tải lên CV: ${err.message}`);
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -186,6 +210,7 @@ export default function ProfilePage() {
   if (!profile) {
     return null;
   }
+
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 lg:px-6">
@@ -296,7 +321,12 @@ export default function ProfilePage() {
         </div>
 
         <div className="divide-y divide-slate-100 p-2">
-          {cvList.length === 0 ? (
+          {isLoading ? (
+            <div className="py-12 text-center">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+              <p className="mt-3 text-sm text-slate-500">Đang tải danh sách CV...</p>
+            </div>
+          ) : cvList.length === 0 ? (
             <div className="py-12 text-center">
               <HiOutlineDocumentText className="mx-auto h-12 w-12 text-slate-300" />
               <p className="mt-3 text-sm text-slate-500">
@@ -307,18 +337,24 @@ export default function ProfilePage() {
             cvList.map((cv, index) => (
               <div
                 key={cv.key}
-                className="flex items-center gap-4 rounded-xl p-4 transition-colors hover:bg-slate-50/50"
+                className="animate-fadeIn flex items-center gap-4 rounded-xl p-4 transition-colors hover:bg-slate-50/50"
+                style={{ animationDelay: `${index * 80}ms` }}
               >
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50">
                   <HiOutlineDocumentText className="h-6 w-6 text-red-500" />
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">
+                  <a
+                    href={cv.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-sm font-semibold text-slate-900 hover:text-blue-600 hover:underline block"
+                  >
                     {cv.filename}
-                  </p>
+                  </a>
                   <p className="text-xs text-slate-400">
-                    {formatFileSize(cv.sizeBytes)} · Cập nhật {formatUpdatedAt(cv.lastModified)}
+                    Cập nhật {new Date(cv.lastModified).toLocaleString('vi-VN')} • {formatFileSize(cv.sizeBytes)}
                   </p>
                 </div>
 

@@ -55,6 +55,7 @@ Resources:
         AllowHeaders:
           - Content-Type
           - Authorization
+          - x-original-filename
         AllowMethods:
           - GET
           - POST
@@ -122,6 +123,26 @@ Resources:
         - AttributeName: userId
           KeyType: HASH
         - AttributeName: jobId
+          KeyType: RANGE
+
+  MatchResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-match-results-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      # TTL: auto-expire old results after 90 days to keep costs low
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: matchId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: matchId
           KeyType: RANGE
 # S3 Buckets
   CvBucket:
@@ -239,6 +260,36 @@ Resources:
         Sourcemap: true
         EntryPoints:
           - src/functions/jobs/getJobById.ts
+
+  SearchJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-search-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/jobs/searchJobs.handler
+      Description: Public endpoint to search and filter jobs from DynamoDB
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+      Events:
+        SearchJobsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /jobs/search
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/jobs/searchJobs.ts
 
   FetchJobsFunction:
     Type: AWS::Serverless::Function
@@ -381,6 +432,145 @@ Resources:
         Sourcemap: true
         EntryPoints:
           - src/functions/savedJobs/handler.ts
+  EvaluateMatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-evaluate-match-${StageName}"
+      CodeUri: .
+      Handler: src/functions/evaluateMatch/handler.handler
+      Description: Full CV matching pipeline - Textract → Bedrock Nova Micro → DynamoDB
+      Timeout: 60
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MatchResultsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:HeadObject
+                - s3:ListBucket
+              Resource:
+                - !GetAtt CvBucket.Arn
+                - !Sub "${CvBucket.Arn}/*"
+            - Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "*"
+      Environment:
+        Variables:
+          CV_BUCKET_NAME: !Ref CvBucket
+          JOBS_TABLE: !Ref JobsTable
+          MATCH_RESULTS_TABLE: !Ref MatchResultsTable
+      Events:
+        EvaluateMatchApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/evaluate
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/evaluateMatch/handler.ts
+
+  GetMatchResultsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-get-match-results-${StageName}"
+      CodeUri: .
+      Handler: src/functions/getMatchResults/handler.handler
+      Description: Retrieve CV match evaluation results for the authenticated user
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MatchResultsTable
+      Environment:
+        Variables:
+          MATCH_RESULTS_TABLE: !Ref MatchResultsTable
+      Events:
+        GetMatchResultsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/match-results
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        GetMatchResultByIdApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/match-results/{matchId}
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/getMatchResults/handler.ts
+
+  ExtractCvFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-extract-cv-${StageName}"
+      CodeUri: .
+      Handler: src/functions/extractCv/handler.handler
+      Description: Extract text content from a user CV stored in S3 using AWS Textract
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:HeadObject
+                - s3:ListBucket
+              Resource:
+                - !GetAtt CvBucket.Arn
+                - !Sub "${CvBucket.Arn}/*"
+            - Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+              Resource: "*"
+      Environment:
+        Variables:
+          CV_BUCKET_NAME: !Ref CvBucket
+      Events:
+        ExtractCvApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/extract
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/extractCv/handler.ts
+
   ManageCvFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -564,3 +754,9 @@ Outputs:
   CvBucketArn:
     Description: "CV S3 Bucket ARN"
     Value: !GetAtt CvBucket.Arn
+  MatchResultsTableName:
+    Description: "Match Results DynamoDB Table Name"
+    Value: !Ref MatchResultsTable
+  EvaluateMatchFunctionArn:
+    Description: "Evaluate Match Lambda Function ARN"
+    Value: !GetAtt EvaluateMatchFunction.Arn

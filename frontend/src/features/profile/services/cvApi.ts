@@ -1,117 +1,98 @@
-import { getIdToken } from "@/features/auth/services/cognitoAuthService";
+import { getIdToken } from '@/features/auth/services/cognitoAuthService';
+import type { CVListResponse, CVUploadResponse } from '@/types/cv';
+import {API_BASE_URL} from '@/lib/constants';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-export type UserCv = {
-  key: string;
-  filename: string;
-  sizeBytes?: number;
-  lastModified?: string;
-  url: string;
-};
-
-type CvListResponse = {
-  items?: UserCv[];
-};
-
-type CvUploadResponse = {
-  data?: {
-    key: string;
-    originalFilename: string;
-    sizeBytes: number;
-    uploadedAt: string;
-    url: string;
-  };
-};
-
-async function getRequiredToken() {
+async function getAuthHeaders(contentType?: string): Promise<HeadersInit> {
   const token = await getIdToken();
   if (!token) {
-    throw new Error("Bạn cần đăng nhập để quản lý CV.");
+    throw new Error('Not authenticated');
   }
-  return token;
+  const headers: HeadersInit = {
+    Authorization: `Bearer ${token}`,
+  };
+  if (contentType) {
+    headers['Content-Type'] = contentType;
+  }
+  return headers;
 }
 
-function getApiBaseUrl() {
+export async function getCVs(): Promise<CVListResponse> {
   if (!API_BASE_URL) {
-    throw new Error("API Base URL is not configured");
+    throw new Error('API Base URL is not configured');
   }
-  return API_BASE_URL;
-}
 
-export async function getUserCvs(): Promise<UserCv[]> {
-  const token = await getRequiredToken();
-  const response = await fetch(`${getApiBaseUrl()}/cv`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/cv`, {
+    method: 'GET',
+    headers,
   });
-
-  if (response.status === 401 || response.status === 403) {
-    throw new Error("Bạn cần đăng nhập để quản lý CV.");
-  }
 
   if (!response.ok) {
-    throw new Error("Không thể tải danh sách CV.");
+    let errorMsg = 'Failed to fetch CVs';
+    try {
+      const errJson = await response.json();
+      errorMsg = errJson.message || errorMsg;
+    } catch {}
+    throw new Error(errorMsg);
   }
 
-  const result = (await response.json()) as CvListResponse;
-  return result.items ?? [];
+  return response.json();
 }
 
-export async function uploadUserCv(file: File): Promise<UserCv> {
-  const token = await getRequiredToken();
-  const response = await fetch(`${getApiBaseUrl()}/cv/upload`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/pdf",
-      "x-original-filename": file.name,
-    },
-    body: await file.arrayBuffer(),
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    throw new Error("Bạn cần đăng nhập để tải CV.");
+export async function uploadCV(file: File): Promise<CVUploadResponse> {
+  if (!API_BASE_URL) {
+    throw new Error('API Base URL is not configured');
   }
 
-  const result = (await response.json().catch(() => ({}))) as CvUploadResponse & {
-    message?: string;
+  const token = await getIdToken();
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const headers: HeadersInit = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/pdf',
+    'x-original-filename': encodeURIComponent(file.name),
   };
 
-  if (!response.ok || !result.data) {
-    throw new Error(result.message || "Không thể tải CV lên.");
-  }
-
-  return {
-    key: result.data.key,
-    filename: result.data.originalFilename,
-    sizeBytes: result.data.sizeBytes,
-    lastModified: result.data.uploadedAt,
-    url: result.data.url,
-  };
-}
-
-export async function deleteUserCv(key: string): Promise<void> {
-  const token = await getRequiredToken();
-  const filename = key.split("/").pop();
-  if (!filename) {
-    throw new Error("CV không hợp lệ.");
-  }
-
-  const response = await fetch(`${getApiBaseUrl()}/cv/${encodeURIComponent(filename)}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  const response = await fetch(`${API_BASE_URL}/cv/upload`, {
+    method: 'POST',
+    headers,
+    body: file,
   });
-
-  if (response.status === 401 || response.status === 403) {
-    throw new Error("Bạn cần đăng nhập để xóa CV.");
-  }
 
   if (!response.ok) {
-    const result = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new Error(result.message || "Không thể xóa CV.");
+    let errorMsg = 'Failed to upload CV';
+    try {
+      const errJson = await response.json();
+      errorMsg = errJson.message || errorMsg;
+    } catch {}
+    throw new Error(errorMsg);
   }
+
+  return response.json();
+}
+
+export async function deleteCV(filename: string): Promise<{ message: string; deletedKey: string }> {
+  if (!API_BASE_URL) {
+    throw new Error('API Base URL is not configured');
+  }
+
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/cv/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorMsg = 'Failed to delete CV';
+    try {
+      const errJson = await response.json();
+      errorMsg = errJson.message || errorMsg;
+    } catch {}
+    throw new Error(errorMsg);
+  }
+
+  return response.json();
 }

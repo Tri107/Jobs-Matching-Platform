@@ -10,6 +10,7 @@ Tài liệu này hướng dẫn cách sử dụng API Gateway trong backend củ
 - [4. Lấy ApiGatewayUrl sau khi deploy](#4-lấy-apigatewayurl-sau-khi-deploy)
 - [5. Cách test endpoint /health](#5-cách-test-endpoint-health)
 - [6. Cách test endpoint /jobs](#6-cách-test-endpoint-jobs)
+- [6.1. Cách test endpoint /jobs/search](#61-cách-test-endpoint-jobssearch)
 - [7. Public route và protected route](#7-public-route-và-protected-route)
 - [7.1. Public route](#71-public-route)
 - [7.2. Protected route](#72-protected-route)
@@ -219,6 +220,135 @@ Ví dụ:
 ```http
 GET /jobs?limit=10
 ```
+
+## 6.1. Cách test endpoint /jobs/search
+
+Endpoint GET /jobs/search dùng để phục vụ trang jobs/search/filter job.
+
+Frontend có thể gọi endpoint này để tìm job theo keyword, location, scheduleType, postedAt và phân trang bằng nextToken.
+
+Đây là public endpoint vì người dùng chưa đăng nhập vẫn nên xem và tìm kiếm job được.
+
+Route:
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| GET | /jobs/search | Public, không cần token |
+
+Query params:
+
+| Param | Kiểu | Ví dụ | Ý nghĩa |
+| --- | --- | --- | --- |
+| keyword | string | react | Tìm trong title, originalTitle, companyName, location, scheduleType, description |
+| location | string | Ho Chi Minh | Lọc theo location |
+| scheduleType | string | Full-time | Lọc theo hình thức làm việc |
+| postedAt | string | 2026-06-19 | Lọc theo postedAt |
+| sort | enum | relevance | Sắp xếp kết quả |
+| limit | number | 10 | Số job scan trong một page, default 10, max 50 |
+| nextToken | string | base64-token | Token phân trang từ response trước |
+
+Sort enum hiện hỗ trợ:
+
+- relevance
+- latest
+- posted_at_asc
+
+Ví dụ request hợp lệ:
+
+```http
+GET /jobs/search?limit=10
+GET /jobs/search?keyword=react&limit=10
+GET /jobs/search?keyword=react&location=Ho%20Chi%20Minh&scheduleType=Full-time&limit=10
+GET /jobs/search?postedAt=2026-06-19&sort=latest&limit=10
+GET /jobs/search?sort=posted_at_asc&limit=10
+GET /jobs/search?nextToken=<nextToken>&limit=10
+```
+
+Response mẫu:
+
+```json
+{
+  "count": 2,
+  "items": [
+    {
+      "jobId": "job-123",
+      "hash": "hash-value",
+      "title": "Frontend Developer",
+      "originalTitle": "Frontend Developer",
+      "companyName": "ABC Company",
+      "location": "Ho Chi Minh",
+      "postedAt": "2026-06-19",
+      "originalPostedAt": "1 day ago",
+      "scheduleType": "Full-time",
+      "sourceLink": "https://example.com/job",
+      "description": "React developer job",
+      "createdAt": "2026-06-19T10:00:00.000Z"
+    }
+  ],
+  "nextToken": "base64-pagination-token",
+  "filters": {
+    "keyword": "react",
+    "location": "Ho Chi Minh",
+    "scheduleType": "Full-time",
+    "limit": 10,
+    "sort": "relevance"
+  }
+}
+```
+
+Nếu không còn trang tiếp theo thì response có thể không có nextToken.
+
+Ví dụ frontend gọi API:
+
+```ts
+const params = new URLSearchParams({
+  keyword: "react",
+  location: "Ho Chi Minh",
+  scheduleType: "Full-time",
+  limit: "10",
+});
+
+const response = await fetch(
+  `${process.env.NEXT_PUBLIC_API_BASE_URL}/jobs/search?${params.toString()}`
+);
+
+const data = await response.json();
+```
+
+Không gửi Authorization header vì endpoint này public.
+
+Test bằng curl:
+
+```bash
+curl "<ApiGatewayUrl>/jobs/search?limit=10"
+curl "<ApiGatewayUrl>/jobs/search?keyword=react&limit=10"
+curl "<ApiGatewayUrl>/jobs/search?location=Ho%20Chi%20Minh&limit=10"
+curl "<ApiGatewayUrl>/jobs/search?scheduleType=Full-time&limit=10"
+curl "<ApiGatewayUrl>/jobs/search?postedAt=2026-06-19&sort=latest&limit=10"
+curl "<ApiGatewayUrl>/jobs/search?limit=10&nextToken=<nextToken>"
+```
+
+Lưu ý kỹ thuật:
+
+- Đây là MVP search/filter trên JobsTable hiện có.
+- Endpoint hiện dùng DynamoDB Scan có limit và filter/sort trong memory trên page dữ liệu đã scan.
+- Vì filter diễn ra sau khi scan một page, response có thể trả ít hơn limit nhưng vẫn có nextToken.
+- Đây chưa phải global search/filter toàn bảng.
+- Nếu data tăng lớn, cần tối ưu sau bằng GSI, OpenSearch hoặc cơ chế indexing khác.
+- Không nằm trong scope task này.
+
+Cảnh báo chi phí:
+
+Endpoint này dùng:
+
+- API Gateway HTTP API
+- Lambda
+- DynamoDB read/scan
+- CloudWatch Logs
+
+DynamoDB Scan có thể tăng chi phí khi dữ liệu lớn hoặc frontend gọi API quá thường xuyên.
+
+Không nên để frontend polling liên tục hoặc gọi API trong vòng lặp.
 
 ## 7. Public route và protected route
 

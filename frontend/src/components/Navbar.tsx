@@ -87,6 +87,23 @@ export function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-3">
+          {!userEmail && (
+            <div className="hidden items-center gap-2 md:flex">
+              <Link
+                href="/login"
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-blue-600"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+              >
+                Đăng ký
+              </Link>
+            </div>
+          )}
+
           {/* Notifications */}
           <button
             type="button"
@@ -191,6 +208,24 @@ export function Navbar() {
               </Link>
             );
           })}
+          {!userEmail && (
+            <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileOpen(false)}
+                className="block rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white text-center shadow-sm hover:bg-blue-700"
+              >
+                Đăng ký
+              </Link>
+            </div>
+          )}
           {userEmail && (
             <div className="mt-2 border-t border-slate-100 pt-3">
               <Link
