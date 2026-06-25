@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   HiOutlinePencil,
   HiOutlineDocumentText,
@@ -9,12 +9,15 @@ import {
   HiOutlineCheckBadge,
   HiOutlineXMark,
 } from 'react-icons/hi2';
-import { mockCurrentUser, mockUserCVs, type MockCV } from '@/mock/users';
+import { mockCurrentUser } from '@/mock/users';
+import { getCVs, uploadCV, deleteCV } from '@/features/profile/services/cvApi';
+import type { CVItem } from '@/types/cv';
 
 export default function ProfilePage() {
   const [name, setName] = useState(mockCurrentUser.name);
   const [phone, setPhone] = useState(mockCurrentUser.phone);
-  const [cvList, setCvList] = useState<MockCV[]>(mockUserCVs);
+  const [cvList, setCvList] = useState<CVItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,43 +29,79 @@ export default function ProfilePage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  useEffect(() => {
+    async function loadCVs() {
+      try {
+        setIsLoading(true);
+        const data = await getCVs();
+        setCvList(data.items || []);
+      } catch (err: any) {
+        showNotification(` Lỗi tải danh sách CV: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadCVs();
+  }, []);
+
   const handleSave = () => {
     setIsEditing(false);
     showNotification('Đã lưu thông tin thành công!');
   };
 
-  const handleDeleteCV = (id: string) => {
-    setCvList((prev) => prev.filter((cv) => cv.id !== id));
-    showNotification('Đã xóa CV thành công!');
+  const extractFilename = (key: string): string => {
+    const parts = key.split('/');
+    return parts[parts.length - 1];
   };
 
-  const handleUploadCV = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeleteCV = async (key: string) => {
+    try {
+      const filename = extractFilename(key);
+      showNotification(' Đang xóa CV...');
+      await deleteCV(filename);
+      showNotification(' Đã xóa CV thành công!');
+      
+      const data = await getCVs();
+      setCvList(data.items || []);
+    } catch (err: any) {
+      showNotification(` Lỗi xóa CV: ${err.message}`);
+    }
+  };
+
+  const handleUploadCV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      showNotification('❌ File không hợp lệ! Chỉ hỗ trợ định dạng PDF.');
+      showNotification(' File không hợp lệ! Chỉ hỗ trợ định dạng PDF.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification(' Kích thước file vượt quá giới hạn 5MB.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     if (cvList.length >= MAX_CVS) {
-      showNotification('Đã đạt giới hạn 3 CV. Vui lòng xóa bớt trước khi tải lên.');
+      showNotification(' Đã đạt giới hạn 3 CV. Vui lòng xóa bớt trước khi tải lên.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    const newCV: MockCV = {
-      id: `cv-${Date.now()}`,
-      fileName: file.name,
-      fileSize: formatFileSize(file.size),
-      uploadedAt: 'vừa xong',
-      status: 'analyzing',
-      isPrimary: cvList.length === 0,
-    };
-    setCvList((prev) => [...prev, newCV]);
-    showNotification('Đã tải lên CV thành công!');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    try {
+      showNotification(' Đang tải CV lên...');
+      await uploadCV(file);
+      showNotification(' Đã tải lên CV thành công!');
+      
+      const data = await getCVs();
+      setCvList(data.items || []);
+    } catch (err: any) {
+      showNotification(` Lỗi tải lên CV: ${err.message}`);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -72,6 +111,7 @@ export default function ProfilePage() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
+
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 lg:px-6">
@@ -211,7 +251,12 @@ export default function ProfilePage() {
         </div>
 
         <div className="divide-y divide-slate-100 p-2">
-          {cvList.length === 0 ? (
+          {isLoading ? (
+            <div className="py-12 text-center">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+              <p className="mt-3 text-sm text-slate-500">Đang tải danh sách CV...</p>
+            </div>
+          ) : cvList.length === 0 ? (
             <div className="py-12 text-center">
               <HiOutlineDocumentText className="mx-auto h-12 w-12 text-slate-300" />
               <p className="mt-3 text-sm text-slate-500">
@@ -221,7 +266,7 @@ export default function ProfilePage() {
           ) : (
             cvList.map((cv, index) => (
               <div
-                key={cv.id}
+                key={cv.key}
                 className="animate-fadeIn flex items-center gap-4 rounded-xl p-4 transition-colors hover:bg-slate-50/50"
                 style={{ animationDelay: `${index * 80}ms` }}
               >
@@ -232,17 +277,22 @@ export default function ProfilePage() {
 
                 {/* File Info */}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {cv.fileName}
-                  </p>
+                  <a
+                    href={cv.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-sm font-semibold text-slate-900 hover:text-blue-600 hover:underline block"
+                  >
+                    {cv.filename}
+                  </a>
                   <p className="text-xs text-slate-400">
-                    Cập nhật {cv.uploadedAt}
+                    Cập nhật {new Date(cv.lastModified).toLocaleString('vi-VN')} • {formatFileSize(cv.sizeBytes)}
                   </p>
                 </div>
 
                 {/* Badge & Actions */}
                 <div className="flex items-center gap-2">
-                  {cv.isPrimary && (
+                  {index === 0 && (
                     <span className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600">
                       <HiOutlineCheckBadge className="h-3.5 w-3.5" />
                       Chính
@@ -250,7 +300,7 @@ export default function ProfilePage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => handleDeleteCV(cv.id)}
+                    onClick={() => handleDeleteCV(cv.key)}
                     className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                   >
                     <HiOutlineTrash className="h-4 w-4" />

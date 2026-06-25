@@ -1,6 +1,6 @@
-'use client';
+'use client'
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   HiOutlineCloudArrowUp,
   HiOutlineDocumentText,
@@ -9,34 +9,12 @@ import {
   HiOutlineFunnel,
   HiOutlineXMark,
 } from 'react-icons/hi2';
-
-interface UploadedFile {
-  id: string;
-  name: string;
-  size: string;
-  uploadedAt: string;
-  status: 'processed' | 'analyzing';
-}
-
-const initialFiles: UploadedFile[] = [
-  {
-    id: 'f1',
-    name: 'CV_Senior_Frontend_2024.pdf',
-    size: '1.2 MB',
-    uploadedAt: '20/05/2024',
-    status: 'processed',
-  },
-  {
-    id: 'f2',
-    name: 'CV_UX_Designer_Final.pdf',
-    size: '850 KB',
-    uploadedAt: '19/05/2024',
-    status: 'analyzing',
-  },
-];
+import { getCVs, uploadCV, deleteCV } from '@/features/profile/services/cvApi';
+import type { CVItem } from '@/types/cv';
 
 export default function UploadCVPage() {
-  const [files, setFiles] = useState<UploadedFile[]>(initialFiles);
+  const [files, setFiles] = useState<CVItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +26,22 @@ export default function UploadCVPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const loadCVs = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await getCVs();
+      setFiles(data.items || []);
+    } catch (err: any) {
+      showNotification(` Lỗi tải danh sách CV: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCVs();
+  }, [loadCVs]);
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -57,10 +51,14 @@ export default function UploadCVPage() {
   };
 
   const handleFile = useCallback(
-    (file: File) => {
-      // PDF-only validation
+    async (file: File) => {
       if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-        showNotification('❌ File không hợp lệ! Chỉ hỗ trợ định dạng PDF.');
+        showNotification(' File không hợp lệ! Chỉ hỗ trợ định dạng PDF.');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification(' Kích thước file vượt quá giới hạn 5MB.');
         return;
       }
 
@@ -69,18 +67,16 @@ export default function UploadCVPage() {
         return;
       }
 
-      const newFile: UploadedFile = {
-        id: `f-${Date.now()}`,
-        name: file.name,
-        size: formatFileSize(file.size),
-        uploadedAt: new Date().toLocaleDateString('vi-VN'),
-        status: 'analyzing',
-      };
-
-      setFiles((prev) => [newFile, ...prev]);
-      showNotification('✅ Đã tải lên CV thành công!');
+      try {
+        showNotification(' Đang tải CV lên...');
+        await uploadCV(file);
+        showNotification(' Đã tải lên CV thành công!');
+        await loadCVs();
+      } catch (err: any) {
+        showNotification(` Lỗi tải lên CV: ${err.message}`);
+      }
     },
-    [files.length]
+    [files.length, loadCVs]
   );
 
   const handleDrop = useCallback(
@@ -112,10 +108,23 @@ export default function UploadCVPage() {
     [handleFile]
   );
 
-  const handleDelete = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
-    showNotification('Đã xóa CV thành công!');
+  const extractFilename = (key: string): string => {
+    const parts = key.split('/');
+    return parts[parts.length - 1];
   };
+
+  const handleDelete = async (key: string) => {
+    try {
+      const filename = extractFilename(key);
+      showNotification(' Đang xóa CV...');
+      await deleteCV(filename);
+      showNotification(' Đã xóa CV thành công!');
+      await loadCVs();
+    } catch (err: any) {
+      showNotification(` Lỗi xóa CV: ${err.message}`);
+    }
+  };
+
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 lg:px-6">
@@ -211,7 +220,12 @@ export default function UploadCVPage() {
           </button>
         </div>
 
-        {files.length === 0 ? (
+        {isLoading ? (
+          <div className="py-16 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            <p className="mt-3 text-sm text-slate-500">Đang tải danh sách CV...</p>
+          </div>
+        ) : files.length === 0 ? (
           <div className="py-16 text-center">
             <HiOutlineDocumentText className="mx-auto h-12 w-12 text-slate-300" />
             <p className="mt-3 text-sm text-slate-500">
@@ -234,7 +248,7 @@ export default function UploadCVPage() {
                 <tbody className="divide-y divide-slate-50">
                   {files.map((file) => (
                     <tr
-                      key={file.id}
+                      key={file.key}
                       className="animate-fadeIn transition-colors hover:bg-slate-50/50"
                     >
                       <td className="px-6 py-4">
@@ -244,40 +258,34 @@ export default function UploadCVPage() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-900">
-                              {file.name}
+                              {file.filename}
                             </p>
-                            <p className="text-xs text-slate-400">{file.size}</p>
+                            <p className="text-xs text-slate-400">{formatFileSize(file.sizeBytes)}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-500">
-                        {file.uploadedAt}
+                        {new Date(file.lastModified).toLocaleDateString('vi-VN')}
                       </td>
                       <td className="px-6 py-4">
-                        {file.status === 'processed' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            Đã xử lý
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
-                            Đang phân tích
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Đã xử lý
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
+                          <a
+                            href={file.url}
+                            target="_blank; noreferrer"
                             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-500"
                             title="Xem"
                           >
                             <HiOutlineEye className="h-5 w-5" />
-                          </button>
+                          </a>
                           <button
                             type="button"
-                            onClick={() => handleDelete(file.id)}
+                            onClick={() => handleDelete(file.key)}
                             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                             title="Xóa"
                           >
@@ -295,7 +303,7 @@ export default function UploadCVPage() {
             <div className="space-y-3 p-4 md:hidden">
               {files.map((file) => (
                 <div
-                  key={file.id}
+                  key={file.key}
                   className="animate-fadeIn rounded-xl border border-slate-100 bg-slate-50/50 p-4"
                 >
                   <div className="flex items-start justify-between">
@@ -304,35 +312,29 @@ export default function UploadCVPage() {
                         <HiOutlineDocumentText className="h-5 w-5 text-red-500" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-900">{file.name}</p>
+                        <p className="text-sm font-bold text-slate-900">{file.filename}</p>
                         <p className="text-xs text-slate-400">
-                          {file.size} • {file.uploadedAt}
+                          {formatFileSize(file.sizeBytes)} • {new Date(file.lastModified).toLocaleDateString('vi-VN')}
                         </p>
                       </div>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between">
-                    {file.status === 'processed' ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        Đã xử lý
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
-                        Đang phân tích
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Đã xử lý
+                    </span>
                     <div className="flex items-center gap-1">
-                      <button
-                        type="button"
+                      <a
+                        href={file.url}
+                        target="_blank; noreferrer"
                         className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-500"
                       >
                         <HiOutlineEye className="h-4 w-4" />
-                      </button>
+                      </a>
                       <button
                         type="button"
-                        onClick={() => handleDelete(file.id)}
+                        onClick={() => handleDelete(file.key)}
                         className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
                       >
                         <HiOutlineTrash className="h-4 w-4" />
