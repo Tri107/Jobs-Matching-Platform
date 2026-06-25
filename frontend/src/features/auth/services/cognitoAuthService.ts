@@ -133,7 +133,6 @@ export type AuthUserProfile = {
   id: string;
   name: string;
   email: string;
-  phone: string;
 };
 
 export async function getAuthUserProfile(): Promise<AuthUserProfile> {
@@ -152,26 +151,18 @@ export async function getAuthUserProfile(): Promise<AuthUserProfile> {
     id: user.userId || username,
     name: attributes.name || email || username || "Tài khoản",
     email,
-    phone: attributes.phone_number || "",
   };
 }
 
 export async function updateAuthUserProfile(profile: {
   name: string;
-  phone?: string;
 }) {
   configureAmplify();
 
-  const userAttributes: Record<string, string> = {
-    name: profile.name,
-  };
-
-  if (profile.phone) {
-    userAttributes.phone_number = profile.phone;
-  }
-
   return updateUserAttributes({
-    userAttributes,
+    userAttributes: {
+      name: profile.name,
+    },
   });
 }
 

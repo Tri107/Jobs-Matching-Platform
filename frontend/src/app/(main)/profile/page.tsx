@@ -54,7 +54,6 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<AuthUserProfile | null>(null);
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [cvList, setCvList] = useState<UserCv[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -78,7 +77,6 @@ export default function ProfilePage() {
         if (!isMounted) return;
         setProfile(userProfile);
         setName(userProfile.name);
-        setPhone(userProfile.phone);
       } catch {
         if (isMounted) {
           router.replace("/login");
@@ -121,12 +119,10 @@ export default function ProfilePage() {
     try {
       await updateAuthUserProfile({
         name: name.trim() || profile.email || "Tài khoản",
-        phone: phone.trim(),
       });
       const nextProfile = await getAuthUserProfile();
       setProfile(nextProfile);
       setName(nextProfile.name);
-      setPhone(nextProfile.phone);
       setIsEditing(false);
       showNotification("Đã lưu thông tin thành công!");
     } catch (error) {
@@ -239,23 +235,6 @@ export default function ProfilePage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={!isEditing}
-                    className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
-                      isEditing
-                        ? "border-blue-300 bg-white text-slate-900 ring-2 ring-blue-100 focus:outline-none focus:ring-blue-200"
-                        : "border-slate-200 bg-slate-50 text-slate-700"
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-500">
-                    Số điện thoại
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="+84901234567"
                     className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
                       isEditing
                         ? "border-blue-300 bg-white text-slate-900 ring-2 ring-blue-100 focus:outline-none focus:ring-blue-200"
