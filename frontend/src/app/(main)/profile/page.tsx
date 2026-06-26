@@ -55,6 +55,7 @@ function getMessage(error: unknown, fallback: string) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -83,16 +84,6 @@ function getMessage(error: unknown, fallback: string) {
         }
       }
 
-      try {
-        const cvs = await getUserCvs();
-        if (isMounted) {
-          setCvList(cvs);
-        }
-      } catch (error) {
-        if (isMounted) {
-          showNotification(getMessage(error, "Không thể tải danh sách CV."));
-        }
-      }
     }
 
     void loadProfile();
@@ -126,6 +117,7 @@ function getMessage(error: unknown, fallback: string) {
       setSaving(false);
     }
   };
+  useEffect(() => {
     async function loadCVs() {
       try {
         setIsLoading(true);
@@ -137,7 +129,7 @@ function getMessage(error: unknown, fallback: string) {
         setIsLoading(false);
       }
     }
-    loadCVs();
+    void loadCVs();
   }, []);
 
   const extractFilename = (key: string): string => {
