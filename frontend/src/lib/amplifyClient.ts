@@ -24,7 +24,7 @@ export function configureAmplify() {
           email: true,
           oauth: {
             domain: process.env.NEXT_PUBLIC_COGNITO_DOMAIN ?? "",
-            scopes: ["openid", "email", "profile"],
+            scopes: ["openid", "email", "profile", "aws.cognito.signin.user.admin"],
             redirectSignIn: [
               process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN ??
                 "http://localhost:3000/auth/callback",
