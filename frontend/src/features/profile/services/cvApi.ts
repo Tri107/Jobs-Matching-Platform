@@ -1,6 +1,6 @@
 import { getIdToken } from '@/features/auth/services/cognitoAuthService';
 import type { CVListResponse, CVUploadResponse } from '@/types/cv';
-import {API_BASE_URL} from '@/lib/constants';
+import { API_BASE_URL } from '@/lib/constants';
 
 
 async function getAuthHeaders(contentType?: string): Promise<HeadersInit> {
@@ -33,7 +33,7 @@ export async function getCVs(): Promise<CVListResponse> {
     try {
       const errJson = await response.json();
       errorMsg = errJson.message || errorMsg;
-    } catch {}
+    } catch { }
     throw new Error(errorMsg);
   }
 
@@ -67,7 +67,7 @@ export async function uploadCV(file: File): Promise<CVUploadResponse> {
     try {
       const errJson = await response.json();
       errorMsg = errJson.message || errorMsg;
-    } catch {}
+    } catch { }
     throw new Error(errorMsg);
   }
 
@@ -90,7 +90,7 @@ export async function deleteCV(filename: string): Promise<{ message: string; del
     try {
       const errJson = await response.json();
       errorMsg = errJson.message || errorMsg;
-    } catch {}
+    } catch { }
     throw new Error(errorMsg);
   }
 

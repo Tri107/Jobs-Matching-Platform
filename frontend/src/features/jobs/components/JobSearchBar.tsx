@@ -30,10 +30,10 @@ export function JobSearchBar({ onSearch, variant = 'compact' }: JobSearchBarProp
 
   if (variant === 'hero') {
     return (
-      <div className="mx-auto w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-blue-900/5">
+      <div className="mx-auto w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-200/50">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-0">
           {/* Keyword */}
-          <div className="flex flex-1 items-center gap-2.5 px-4 py-2">
+          <div className="flex flex-[1.5] items-center gap-2.5 px-4 py-2">
             <HiOutlineMagnifyingGlass className="h-5 w-5 shrink-0 text-slate-400" />
             <input
               type="text"
@@ -48,12 +48,12 @@ export function JobSearchBar({ onSearch, variant = 'compact' }: JobSearchBarProp
           <div className="hidden h-8 w-px bg-slate-200 md:block" />
 
           {/* Location */}
-          <div className="flex flex-1 items-center gap-2.5 px-4 py-2">
+          <div className="relative flex flex-1 items-center gap-2.5 px-4 py-2">
             <HiOutlineMapPin className="h-5 w-5 shrink-0 text-slate-400" />
             <select
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full cursor-pointer bg-transparent text-sm text-slate-700 outline-none"
+              className="w-full cursor-pointer appearance-none bg-transparent pr-6 text-sm text-slate-700 outline-none"
             >
               {LOCATION_OPTIONS.map((loc) => (
                 <option key={loc} value={loc}>
@@ -61,31 +61,18 @@ export function JobSearchBar({ onSearch, variant = 'compact' }: JobSearchBarProp
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="hidden h-8 w-px bg-slate-200 md:block" />
-
-          {/* Salary */}
-          <div className="flex flex-1 items-center gap-2.5 px-4 py-2">
-            <HiOutlineBanknotes className="h-5 w-5 shrink-0 text-slate-400" />
-            <select
-              value={salaryRange}
-              onChange={(e) => setSalaryRange(Number(e.target.value))}
-              className="w-full cursor-pointer bg-transparent text-sm text-slate-700 outline-none"
-            >
-              {SALARY_RANGES.map((range, idx) => (
-                <option key={range.label} value={idx}>
-                  {range.label}
-                </option>
-              ))}
-            </select>
+            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
 
           {/* Search button */}
           <button
             type="button"
             onClick={handleSearch}
-            className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 hover:shadow-blue-600/30 md:ml-1"
+            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 md:ml-1"
           >
             Tìm kiếm ngay
           </button>

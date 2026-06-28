@@ -22,11 +22,11 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
   return (
     <div className="group relative flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-blue-200 hover:shadow-md">
       {/* Logo */}
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-2xl overflow-hidden">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 overflow-hidden">
         {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
           <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
         ) : (
-          <span>{job.logo || '💻'}</span>
+          <img src="/briefcase.svg" alt={job.company} className="h-full w-full object-cover" />
         )}
       </div>
 
@@ -114,11 +114,11 @@ function JobCardGrid({ job, isFavorite, onToggleFavorite }: Omit<JobCardProps, '
 
       {/* Title & Logo */}
       <div className="flex items-start gap-3 w-full">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 border border-slate-100 text-xl overflow-hidden">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 border border-slate-100 overflow-hidden">
           {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
             <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
           ) : (
-            <span>{job.logo || '💻'}</span>
+            <img src="/briefcase.svg" alt={job.company} className="h-full w-full object-cover" />
           )}
         </div>
         <div className="min-w-0 flex-1">
