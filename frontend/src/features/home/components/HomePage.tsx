@@ -20,8 +20,18 @@ export function HomePage() {
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
-    const result = await getJobs(1, 12, 'matchScore');
-    setFeaturedJobs(result.data);
+    const result = await getJobs(1, 50, 'postedAt');
+    
+    // Sort on client side to show latest jobs first
+    const getJobTime = (job: Job): number => {
+      const dateStr = job.postedAt;
+      if (!dateStr) return 0;
+      const parsed = Date.parse(dateStr);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    
+    const sorted = [...result.data].sort((a, b) => getJobTime(b) - getJobTime(a));
+    setFeaturedJobs(sorted.slice(0, 12));
     setLoading(false);
   }, []);
 
@@ -39,21 +49,16 @@ export function HomePage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 px-4 py-16 text-white lg:py-20">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.15),_transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.08),_transparent_40%)]" />
-
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#111e2e] via-[#24354a] to-[#7e8e9f] px-4 py-20 text-white lg:py-24">
         <div className="relative mx-auto max-w-4xl text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
-            AI Match - Tìm việc làm, Tuyển dụng{' '}
-            <span className="text-blue-200">hiệu quả</span>
+          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl leading-tight">
+            Tìm việc làm, Tuyển dụng hiệu quả
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-blue-100 sm:text-lg">
-            Hệ thống AI phân tích hồ sơ và đề xuất cơ hội khớp nhất với bạn dựa
-            trên kỹ năng và kinh nghiệm thực tế.
+          <p className="mx-auto mt-6 max-w-4xl text-sm text-slate-300 sm:text-base font-medium">
+            Hệ thống AI phân tích hồ sơ và đề xuất cơ hội khớp nhất với bạn dựa trên kỹ năng và kinh nghiệm thực tế.
           </p>
 
-          <div className="mt-8">
+          <div className="mt-10">
             <JobSearchBar onSearch={handleSearch} variant="hero" />
           </div>
         </div>
@@ -64,10 +69,10 @@ export function HomePage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              Việc làm tốt nhất dành cho bạn
+              Việc làm mới nhất
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Gợi ý thông minh dựa trên hồ sơ và kỹ năng của bạn
+              Các cơ hội nghề nghiệp mới nhất được cập nhật liên tục từ hệ thống
             </p>
           </div>
           <div>

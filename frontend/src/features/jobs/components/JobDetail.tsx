@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Job } from '@/types/job';
 import { getJobById } from '@/features/jobs/services/jobApi';
 import { formatSalaryRange } from '@/features/jobs/utils/formatSalary';
 import { MatchBadge } from './MatchBadge';
 import { useFavoritesStore } from '@/features/jobs/hooks/useFavorites';
+import { useCurrentUserEmail } from '@/features/auth/hooks/useCurrentUserEmail';
+import { getCVs } from '@/features/profile/services/cvApi';
+import type { CVItem } from '@/types/cv';
 import {
   HiOutlineMapPin,
   HiOutlineBriefcase,
@@ -23,8 +27,32 @@ interface JobDetailProps {
 }
 
 export function JobDetail({ jobId }: JobDetailProps) {
+  const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const { userEmail } = useCurrentUserEmail();
+  const [showSelector, setShowSelector] = useState(false);
+  const [cvList, setCvList] = useState<CVItem[]>([]);
+  const [loadingCvs, setLoadingCvs] = useState(false);
+  const [cvError, setCvError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showSelector && userEmail) {
+      setLoadingCvs(true);
+      setCvError(null);
+      getCVs()
+        .then((res) => {
+          setCvList(res.items || []);
+          setLoadingCvs(false);
+        })
+        .catch((err) => {
+          console.error('Error fetching CVs:', err);
+          setCvError('Không thể tải danh sách CV');
+          setLoadingCvs(false);
+        });
+    }
+  }, [showSelector, userEmail]);
 
   const { favoriteIds, toggleFavorite, fetchFavorites } = useFavoritesStore();
   const isFavorite = favoriteIds.has(jobId);
@@ -81,11 +109,11 @@ export function JobDetail({ jobId }: JobDetailProps) {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             {/* Header */}
             <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-3xl overflow-hidden">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden">
                 {job.logo && (job.logo.startsWith('http') || job.logo.startsWith('/') || job.logo.startsWith('data:')) ? (
                   <img src={job.logo} alt={job.company} className="h-full w-full object-cover" />
                 ) : (
-                  <span>{job.logo || '💻'}</span>
+                  <img src="/briefcase.svg" alt={job.company} className="h-full w-full object-cover" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -194,8 +222,8 @@ export function JobDetail({ jobId }: JobDetailProps) {
               type="button"
               onClick={() => job && toggleFavorite(job)}
               className={`mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-all ${isFavorite
-                  ? 'border-red-200 bg-red-50 text-red-500'
-                  : 'border-slate-200 text-slate-700 hover:border-blue-200 hover:text-blue-600'
+                ? 'border-red-200 bg-red-50 text-red-500'
+                : 'border-slate-200 text-slate-700 hover:border-blue-200 hover:text-blue-600'
                 }`}
             >
               {isFavorite ? (
@@ -206,13 +234,68 @@ export function JobDetail({ jobId }: JobDetailProps) {
               {isFavorite ? 'Đã lưu tin' : 'Lưu tin tuyển dụng'}
             </button>
 
-            <Link
-              href="/upload-cv"
+            <button
+              type="button"
+              onClick={() => setShowSelector(!showSelector)}
               className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
             >
               <HiOutlineDocumentArrowUp className="h-5 w-5" />
               Đánh giá CV theo công việc
-            </Link>
+            </button>
+
+            {showSelector && (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-left">
+                {!userEmail ? (
+                  <div className="text-center">
+                    <p className="text-xs text-amber-600 font-medium">Vui lòng đăng nhập để chọn CV.</p>
+                    <Link
+                      href="/login"
+                      className="mt-2 inline-block text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      Đăng nhập ngay &rarr;
+                    </Link>
+                  </div>
+                ) : loadingCvs ? (
+                  <div className="flex flex-col items-center justify-center py-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    <span className="mt-1 text-[10px] text-slate-500">Đang tải CV...</span>
+                  </div>
+                ) : cvList.length === 0 ? (
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500">Bạn chưa tải lên CV nào trong profile.</p>
+                    <Link
+                      href="/profile"
+                      className="mt-2 inline-block text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      Quản lý CV &rarr;
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-500">
+                      Chọn CV để phân tích:
+                    </label>
+                    <div className="space-y-1.5">
+                      {cvList.map((cv) => (
+                        <button
+                          key={cv.key}
+                          type="button"
+                          onClick={() => router.push('/cv-analysis')}
+                          className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs font-medium text-slate-700 transition-colors hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-600 text-left"
+                        >
+                          <HiOutlineDocumentArrowUp className="h-4 w-4 shrink-0 text-slate-400" />
+                          <span className="truncate flex-1">{cv.filename}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {cvError && (
+                  <p className="mt-2 text-[10px] font-medium text-red-500 text-center">{cvError}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
