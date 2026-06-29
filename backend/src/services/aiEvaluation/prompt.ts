@@ -1,5 +1,5 @@
 import { aiEvaluationResultSchema } from "./schema.js";
-import type { AiEvaluationInput } from "./types.js";
+import type { AiEvaluationInput } from "../../types/aiEvaluation.js";
 
 export function buildCvMatchingPrompt(input: AiEvaluationInput): string {
   const jobContext = [

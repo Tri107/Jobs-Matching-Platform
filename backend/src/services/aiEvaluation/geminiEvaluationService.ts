@@ -6,7 +6,7 @@ import {
   geminiAiEvaluationResponseSchema,
 } from "./geminiSchema.js";
 import { parseAiJsonResponse } from "./jsonParser.js";
-import type { AiEvaluationInput, AiEvaluationResult } from "./types.js";
+import type { AiEvaluationInput, AiEvaluationResult } from "../../types/aiEvaluation.js";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
 
