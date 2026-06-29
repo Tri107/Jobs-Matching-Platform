@@ -10,6 +10,8 @@ export function buildCvMatchingPrompt(input: AiEvaluationInput): string {
   return [
     "You are an AI evaluator for CV-to-job matching.",
     "Evaluate the CV against the job description and return only a valid JSON object that matches the schema exactly.",
+    "Return all natural-language content in Vietnamese. This includes summary, strengths, weaknesses, matchedSkills, missingSkills, and suggestions.",
+    "Keep the JSON keys exactly as specified in English.",
     "Do not return markdown, code fences, explanations, comments, or any text outside the JSON object.",
     "",
     "Rubric:",
