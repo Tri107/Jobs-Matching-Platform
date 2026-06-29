@@ -3,15 +3,17 @@ import { jsonResponse } from "../../utils/httpResponse.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { TextractService } from "../../services/textractService.js";
-import { BedrockService } from "../../services/bedrockService.js";
 import { MatchRepository } from "../../repositories/matchRepository.js";
+import {
+  evaluateCvMatchWithGemini,
+  getGeminiEvaluationModelId,
+} from "../../services/aiEvaluation/geminiEvaluationService.js";
 import type { Job } from "../../types/job.js";
 import type { EvaluateMatchRequest, MatchResult } from "../../types/matching.js";
 import { randomUUID } from "crypto";
 
 // Singletons — reused across warm Lambda invocations
 let textractService: TextractService | null = null;
-let bedrockService: BedrockService | null = null;
 let matchRepository: MatchRepository | null = null;
 let docClient: DynamoDBDocumentClient | null = null;
 
@@ -25,10 +27,6 @@ function getTextract() {
   if (!textractService) textractService = new TextractService();
   return textractService;
 }
-function getBedrock() {
-  if (!bedrockService) bedrockService = new BedrockService();
-  return bedrockService;
-}
 function getMatchRepo() {
   if (!matchRepository) matchRepository = new MatchRepository();
   return matchRepository;
@@ -41,7 +39,7 @@ function getMatchRepo() {
  * Full pipeline:
  *   1. Fetch job from DynamoDB
  *   2. Extract CV text from S3 via Textract
- *   3. Send to Bedrock (Nova Micro) for scoring
+ *   3. Send to Gemini for scoring
  *   4. Persist result in MatchResultsTable
  *   5. Return score to caller
  */
@@ -101,9 +99,13 @@ export async function handler(event: APIGatewayProxyEventV2) {
       return jsonResponse(422, { message: "Could not extract text from CV — the PDF may be image-only or corrupted" });
     }
 
-    // --- Step 3: AI evaluation via Bedrock (Nova Micro) ---
-    const bedrock = getBedrock();
-    const score = await bedrock.evaluateMatch(cvText, job.title, job.description);
+    // --- Step 3: AI evaluation via Gemini ---
+    const score = await evaluateCvMatchWithGemini({
+      cvText,
+      jobTitle: job.title,
+      companyName: job.companyName,
+      jobDescription: job.description,
+    });
 
     // --- Step 4: Persist result ---
     const matchResult: MatchResult = {
@@ -113,7 +115,7 @@ export async function handler(event: APIGatewayProxyEventV2) {
       cvKey,
       score,
       evaluatedAt: new Date().toISOString(),
-      modelId: bedrock.modelId,
+      modelId: getGeminiEvaluationModelId(),
     };
 
     await getMatchRepo().save(matchResult);

@@ -30,6 +30,14 @@ Parameters:
     Default: jobs-matching-auth-dev
     Description: Cognito Hosted UI domain prefix
 
+  GeminiApiKeyParameterName:
+    Type: String
+    Default: /jobs-matching/dev/gemini-api-key
+
+  GeminiModel:
+    Type: String
+    Default: gemini-3.1-flash-lite
+
 Globals:
   Function:
     Runtime: nodejs24.x
@@ -462,11 +470,17 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource: "*"
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GeminiApiKeyParameterName}"
       Environment:
         Variables:
           CV_BUCKET_NAME: !Ref CvBucket
           JOBS_TABLE: !Ref JobsTable
           MATCH_RESULTS_TABLE: !Ref MatchResultsTable
+          GEMINI_API_KEY_PARAMETER_NAME: !Ref GeminiApiKeyParameterName
+          GEMINI_MODEL: !Ref GeminiModel
       Events:
         EvaluateMatchApi:
           Type: HttpApi
