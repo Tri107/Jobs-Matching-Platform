@@ -14,7 +14,7 @@ export async function evaluateCvMatchWithGemini(
   input: AiEvaluationInput,
 ): Promise<AiEvaluationResult> {
   const apiKey = await getGeminiApiKey();
-  const model = getGeminiModel();
+  const model = getGeminiEvaluationModelId();
   const ai = new GoogleGenAI({ apiKey });
   const prompt = buildCvMatchingPrompt(input);
 
@@ -46,7 +46,7 @@ export async function evaluateCvMatchWithGemini(
   }
 }
 
-function getGeminiModel(): string {
+export function getGeminiEvaluationModelId(): string {
   const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 
   if (!model) {
