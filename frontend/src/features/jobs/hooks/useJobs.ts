@@ -12,14 +12,18 @@ interface JobsStore {
   currentPage: number;
   totalPages: number;
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
   searchParams: JobSearchParams;
   filterParams: JobFilterParams;
   sortBy: 'matchScore' | 'postedAt' | 'salaryMax';
+  nextToken: string | undefined;
+  hasMore: boolean;
 
   // Actions
   fetchJobs: () => Promise<void>;
   searchJobs: () => Promise<void>;
+  loadMore: () => Promise<void>;
   setSearchParams: (params: Partial<JobSearchParams>) => void;
   setFilterParams: (params: Partial<JobFilterParams>) => void;
   setSortBy: (sortBy: 'matchScore' | 'postedAt' | 'salaryMax') => void;
@@ -34,12 +38,15 @@ export const useJobsStore = create<JobsStore>((set, get) => ({
   currentPage: 1,
   totalPages: 0,
   loading: false,
+  loadingMore: false,
   error: null,
   searchParams: {},
   filterParams: {},
   sortBy: 'matchScore',
+  nextToken: undefined,
+  hasMore: false,
 
-  // Fetch jobs with current params
+  // Fetch jobs with current params (initial load)
   fetchJobs: async () => {
     set({ loading: true, error: null });
     try {
@@ -56,21 +63,50 @@ export const useJobsStore = create<JobsStore>((set, get) => ({
     }
   },
 
-  // Search with current search + filter params
+  // Search with current search + filter params using /jobs/search
   searchJobs: async () => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, nextToken: undefined, hasMore: false });
     try {
       const { searchParams, filterParams, sortBy } = get();
-      const result = await jobApi.searchJobs(searchParams, filterParams, sortBy);
+      const result = await jobApi.searchJobs(
+        { ...searchParams, nextToken: undefined },
+        filterParams,
+        sortBy
+      );
       set({
-        jobs: result.data,
+        jobs: result.jobs,
         totalJobs: result.total,
-        currentPage: result.page,
-        totalPages: result.totalPages,
+        currentPage: 1,
+        totalPages: 1,
         loading: false,
+        nextToken: result.nextToken,
+        hasMore: !!result.nextToken,
       });
     } catch {
       set({ error: 'Không thể tìm kiếm việc làm', loading: false });
+    }
+  },
+
+  // Load more results using nextToken (cursor pagination)
+  loadMore: async () => {
+    const { nextToken, loadingMore, searchParams, filterParams, sortBy } = get();
+    if (!nextToken || loadingMore) return;
+
+    set({ loadingMore: true, error: null });
+    try {
+      const result = await jobApi.searchJobs(
+        { ...searchParams, nextToken },
+        filterParams,
+        sortBy
+      );
+      set((state) => ({
+        jobs: [...state.jobs, ...result.jobs],
+        loadingMore: false,
+        nextToken: result.nextToken,
+        hasMore: !!result.nextToken,
+      }));
+    } catch {
+      set({ error: 'Không thể tải thêm việc làm', loadingMore: false });
     }
   },
 
@@ -105,6 +141,8 @@ export const useJobsStore = create<JobsStore>((set, get) => ({
       filterParams: {},
       sortBy: 'matchScore',
       currentPage: 1,
+      nextToken: undefined,
+      hasMore: false,
     });
   },
 }));

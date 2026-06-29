@@ -21,13 +21,20 @@ export interface Job {
   logo: string;
 }
 
+/** Sort values supported by GET /jobs/search API */
+export type ApiSortType = 'relevance' | 'latest' | 'posted_at_asc';
+
 export interface JobSearchParams {
   keyword?: string;
   location?: string;
   salaryMin?: number;
   salaryMax?: number;
+  scheduleType?: string;
+  postedAt?: string;
+  sort?: ApiSortType;
   page?: number;
   limit?: number;
+  nextToken?: string;
   sortBy?: 'matchScore' | 'postedAt' | 'salaryMax';
 }
 
@@ -52,3 +59,16 @@ export interface DynamoJobItem {
   title?: string;
 }
 
+/** Response shape from GET /jobs/search */
+export interface SearchApiResponse {
+  count: number;
+  items: DynamoJobItem[];
+  nextToken?: string;
+  filters?: {
+    keyword?: string;
+    location?: string;
+    scheduleType?: string;
+    limit?: number;
+    sort?: string;
+  };
+}
