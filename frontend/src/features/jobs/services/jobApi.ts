@@ -2,7 +2,7 @@
  * API service for Jobs feature integrated with AWS API Gateway & DynamoDB
  */
 
-import type { Job, JobSearchParams, JobFilterParams, DynamoJobItem } from '@/types/job';
+import type { Job, JobSearchParams, JobFilterParams, DynamoJobItem, ApiSortType, SearchApiResponse } from '@/types/job';
 import type { PaginatedResponse } from '@/types/common';
 import { PAGINATION } from '@/lib/constants';
 import { getIdToken } from '@/features/auth/services/cognitoAuthService';
@@ -18,6 +18,17 @@ async function getRequiredIdToken(): Promise<SavedJobResult & { token?: string }
   }
 }
 
+/** Map frontend sortBy to API sort enum */
+function mapSortToApi(sortBy: string): ApiSortType {
+  switch (sortBy) {
+    case 'postedAt':
+      return 'latest';
+    case 'salaryMax':
+      return 'posted_at_asc'; // closest available alternative
+    default:
+      return 'relevance';
+  }
+}
 
 // Helper to map DynamoDB attributes to frontend Job interface
 function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
@@ -110,46 +121,130 @@ export async function getJobById(id: string): Promise<Job | null> {
 }
 
 /**
- * Search and filter jobs using API
+ * Search result that includes nextToken for cursor-based pagination
+ */
+export interface SearchJobsResult {
+  jobs: Job[];
+  total: number;
+  nextToken?: string;
+}
+
+/**
+ * Search and filter jobs using GET /jobs/search endpoint
+ * Supports: keyword, location, scheduleType, postedAt, sort, limit, nextToken
  */
 export async function searchJobs(
   searchParams: JobSearchParams,
   filterParams: JobFilterParams,
   sortBy: 'matchScore' | 'postedAt' | 'salaryMax' = 'matchScore'
-): Promise<PaginatedResponse<Job>> {
+): Promise<SearchJobsResult> {
   try {
     if (!API_BASE_URL) {
       throw new Error('API Base URL is not configured');
     }
+
     const limit = searchParams.limit ?? PAGINATION.DEFAULT_LIMIT;
-    let url = `${API_BASE_URL}/jobs?limit=${limit}`;
-    if (searchParams.keyword) {
-      url += `&keyword=${encodeURIComponent(searchParams.keyword)}`;
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+
+    // keyword search
+    if (searchParams.keyword?.trim()) {
+      params.set('keyword', searchParams.keyword.trim());
     }
+
+    // location filter - skip if "all"
+    if (searchParams.location?.trim() && searchParams.location !== 'Tất cả địa điểm') {
+      params.set('location', searchParams.location.trim());
+    }
+
+    // scheduleType from filter sidebar (workType → scheduleType mapping)
+    const scheduleType = searchParams.scheduleType || mapWorkTypeToScheduleType(filterParams.workType);
+    if (scheduleType) {
+      params.set('scheduleType', scheduleType);
+    }
+
+    // postedAt filter
+    if (searchParams.postedAt) {
+      params.set('postedAt', searchParams.postedAt);
+    }
+
+    // sort
+    const apiSort = searchParams.sort || mapSortToApi(sortBy);
+    params.set('sort', apiSort);
+
+    // cursor pagination
+    if (searchParams.nextToken) {
+      params.set('nextToken', searchParams.nextToken);
+    }
+
+    const url = `${API_BASE_URL}/jobs/search?${params.toString()}`;
     const response = await fetch(url);
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const result = await response.json();
-    const items = (result.items || []).map(mapDynamoJobToFrontendJob);
+
+    const result: SearchApiResponse = await response.json();
+    let items = (result.items || []).map(mapDynamoJobToFrontendJob);
+
+    // Client-side filters for params the API doesn't support
+    items = applyClientSideFilters(items, filterParams);
 
     return {
-      data: items,
+      jobs: items,
       total: result.count || items.length,
-      page: searchParams.page ?? 1,
-      limit,
-      totalPages: Math.ceil((result.count || items.length) / limit),
+      nextToken: result.nextToken,
     };
   } catch (error) {
     console.error("Failed to search jobs from API", error);
     return {
-      data: [],
+      jobs: [],
       total: 0,
-      page: searchParams.page ?? 1,
-      limit: searchParams.limit ?? PAGINATION.DEFAULT_LIMIT,
-      totalPages: 0,
     };
   }
+}
+
+/**
+ * Map frontend workType array to API scheduleType param
+ * API only accepts a single scheduleType value, so we pick the first selected
+ */
+function mapWorkTypeToScheduleType(workTypes?: string[]): string | undefined {
+  if (!workTypes || workTypes.length === 0) return undefined;
+  // Map frontend values to API-expected values
+  const mapping: Record<string, string> = {
+    'Fulltime': 'Full-time',
+    'Part-time': 'Part-time',
+    'Remote': 'Remote',
+    'Hybrid': 'Hybrid',
+  };
+  return mapping[workTypes[0]] || workTypes[0];
+}
+
+/**
+ * Apply client-side filters for params the API doesn't support
+ * (experience, skills)
+ */
+function applyClientSideFilters(jobs: Job[], filterParams: JobFilterParams): Job[] {
+  let filtered = jobs;
+
+  // Filter by experience (client-side)
+  if (filterParams.experience && filterParams.experience.length > 0) {
+    filtered = filtered.filter(job =>
+      filterParams.experience!.includes(job.experience)
+    );
+  }
+
+  // Filter by skills (client-side - check if job description contains skill keywords)
+  if (filterParams.skills && filterParams.skills.length > 0) {
+    filtered = filtered.filter(job => {
+      const text = `${job.title} ${job.description}`.toLowerCase();
+      return filterParams.skills!.some(skill =>
+        text.includes(skill.toLowerCase())
+      );
+    });
+  }
+
+  return filtered;
 }
 
 export type SavedJobResult = {
