@@ -10,6 +10,7 @@ import { MatchBadge } from './MatchBadge';
 import { useFavoritesStore } from '@/features/jobs/hooks/useFavorites';
 import { useCurrentUserEmail } from '@/features/auth/hooks/useCurrentUserEmail';
 import { getCVs } from '@/features/profile/services/cvApi';
+import { evaluateCvMatch } from '@/features/cv-analysis/services/cvAnalysisApi';
 import type { CVItem } from '@/types/cv';
 import {
   HiOutlineMapPin,
@@ -36,6 +37,7 @@ export function JobDetail({ jobId }: JobDetailProps) {
   const [cvList, setCvList] = useState<CVItem[]>([]);
   const [loadingCvs, setLoadingCvs] = useState(false);
   const [cvError, setCvError] = useState<string | null>(null);
+  const [isAnalyzingCv, setIsAnalyzingCv] = useState(false);
 
   useEffect(() => {
     if (showSelector && userEmail) {
@@ -68,6 +70,28 @@ export function JobDetail({ jobId }: JobDetailProps) {
       setLoading(false);
     });
   }, [jobId]);
+
+  async function handleEvaluateCv(cvKey: string) {
+    if (isAnalyzingCv) {
+      return;
+    }
+
+    setIsAnalyzingCv(true);
+    setCvError(null);
+
+    try {
+      const result = await evaluateCvMatch({
+        jobId,
+        cvKey,
+      });
+      sessionStorage.setItem('cvAnalysisResult', JSON.stringify(result));
+      router.push('/cv-analysis');
+    } catch {
+      setCvError('Không thể phân tích CV. Vui lòng thử lại.');
+    } finally {
+      setIsAnalyzingCv(false);
+    }
+  }
 
   if (loading) {
     return <JobDetailSkeleton />;
@@ -237,10 +261,11 @@ export function JobDetail({ jobId }: JobDetailProps) {
             <button
               type="button"
               onClick={() => setShowSelector(!showSelector)}
-              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
+              disabled={isAnalyzingCv}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <HiOutlineDocumentArrowUp className="h-5 w-5" />
-              Đánh giá CV theo công việc
+              {isAnalyzingCv ? 'Đang phân tích CV...' : 'Đánh giá CV theo công việc'}
             </button>
 
             {showSelector && (
@@ -280,14 +305,21 @@ export function JobDetail({ jobId }: JobDetailProps) {
                         <button
                           key={cv.key}
                           type="button"
-                          onClick={() => router.push('/cv-analysis')}
-                          className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs font-medium text-slate-700 transition-colors hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-600 text-left"
+                          onClick={() => handleEvaluateCv(cv.key)}
+                          disabled={isAnalyzingCv}
+                          className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-left text-xs font-medium text-slate-700 transition-colors hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <HiOutlineDocumentArrowUp className="h-4 w-4 shrink-0 text-slate-400" />
                           <span className="truncate flex-1">{cv.filename}</span>
                         </button>
                       ))}
                     </div>
+                    {isAnalyzingCv && (
+                      <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-center">
+                        <p className="text-xs font-semibold text-blue-700">Đang phân tích CV...</p>
+                        <p className="mt-1 text-[10px] text-blue-600">Quá trình này có thể mất vài giây.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
