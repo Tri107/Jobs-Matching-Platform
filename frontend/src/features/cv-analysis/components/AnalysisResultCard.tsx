@@ -24,7 +24,7 @@ export function AnalysisResultCard({ result, scoreLabel }: AnalysisResultCardPro
       <div className="lg:col-span-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-6 text-center text-sm font-bold uppercase tracking-wider text-slate-500">
-            Match Score Tổng Thể
+            Mức độ phù hợp tổng thể
           </h3>
           <ScoreRing score={score.overallScore} label={scoreLabel} />
 
@@ -57,7 +57,7 @@ export function AnalysisResultCard({ result, scoreLabel }: AnalysisResultCardPro
             icon={<HiOutlineCheckCircle className="h-5 w-5 text-emerald-500" />}
           />
           <AnalysisSection
-            title="Điểm yếu"
+            title="Điểm cần cải thiện"
             items={score.weaknesses}
             tone="danger"
             icon={<HiOutlineExclamationTriangle className="h-5 w-5 text-red-400" />}
@@ -75,7 +75,7 @@ export function AnalysisResultCard({ result, scoreLabel }: AnalysisResultCardPro
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
             <HiOutlineSparkles className="h-5 w-5 text-blue-500" />
-            <h3 className="text-base font-bold text-slate-900">Kỹ năng cần bổ sung</h3>
+            <h3 className="text-base font-bold text-slate-900">Kỹ năng còn thiếu</h3>
           </div>
           <SkillChips skills={score.missingSkills} variant="missing" />
         </div>

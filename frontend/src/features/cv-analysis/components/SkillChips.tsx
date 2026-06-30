@@ -1,7 +1,7 @@
 import { HiOutlinePlusSmall } from 'react-icons/hi2';
 
 interface SkillChipsProps {
-  skills: string[];
+  skills?: string[];
   variant?: 'matched' | 'missing';
 }
 
@@ -11,9 +11,15 @@ const variantClasses = {
 };
 
 export function SkillChips({ skills, variant = 'missing' }: SkillChipsProps) {
+  const safeSkills = Array.isArray(skills) ? skills : [];
+
+  if (safeSkills.length === 0) {
+    return <p className="text-sm text-slate-500">Chưa có dữ liệu.</p>;
+  }
+
   return (
     <div className="flex flex-wrap gap-2">
-      {skills.map((skill) => (
+      {safeSkills.map((skill) => (
         <span
           key={skill}
           className={`inline-flex items-center gap-1 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${variantClasses[variant]}`}

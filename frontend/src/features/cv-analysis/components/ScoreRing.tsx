@@ -53,7 +53,7 @@ export function ScoreRing({ score, label }: ScoreRingProps) {
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`text-4xl font-extrabold ${color.text}`}>{score}%</span>
           <span
-            className="mt-1 rounded-full px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+            className="mt-1 rounded-full px-3 py-0.5 text-[10px] font-bold text-white"
             style={{ backgroundColor: color.ring }}
           >
             {label}
