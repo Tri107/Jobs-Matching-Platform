@@ -1,14 +1,19 @@
 'use client';
 
-import Link from 'next/link';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { AnalysisResultCard } from '@/features/cv-analysis/components/AnalysisResultCard';
-import type { CvMatchResult } from '@/types/cvAnalysis';
+import { CvAnalysisEmptyState } from '@/features/cv-analysis/components/CvAnalysisEmptyState';
+import { CvAnalysisErrorState } from '@/features/cv-analysis/components/CvAnalysisErrorState';
+import { CvAnalysisLoading } from '@/features/cv-analysis/components/CvAnalysisLoading';
+import type { CvMatchResult, CvMatchScore } from '@/types/cvAnalysis';
 
 const CV_ANALYSIS_RESULT_STORAGE_KEY = 'cvAnalysisResult';
 
-let cachedStoredResult: CvMatchResult | null = null;
-let cachedStoredResultRaw: string | null = null;
+type CvAnalysisPageState =
+  | { status: 'loading'; result: null }
+  | { status: 'empty'; result: null }
+  | { status: 'error'; result: null }
+  | { status: 'success'; result: CvMatchResult };
 
 function getScoreLabel(score: number): string {
   if (score >= 80) {
@@ -29,71 +34,104 @@ function formatEvaluatedAt(evaluatedAt: string): string {
   }).format(new Date(evaluatedAt));
 }
 
-function readStoredAnalysisResult(): CvMatchResult | null {
-  const storedResult = window.sessionStorage.getItem(CV_ANALYSIS_RESULT_STORAGE_KEY);
-  if (!storedResult) {
-    cachedStoredResult = null;
-    cachedStoredResultRaw = null;
-    return null;
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isValidScore(score: unknown): score is CvMatchScore {
+  if (!score || typeof score !== 'object') {
+    return false;
   }
 
-  if (storedResult === cachedStoredResultRaw) {
-    return cachedStoredResult;
+  const candidate = score as Partial<CvMatchScore>;
+
+  return (
+    typeof candidate.overallScore === 'number' &&
+    typeof candidate.skillsScore === 'number' &&
+    typeof candidate.experienceScore === 'number' &&
+    typeof candidate.educationScore === 'number' &&
+    typeof candidate.summary === 'string' &&
+    isStringArray(candidate.strengths) &&
+    isStringArray(candidate.weaknesses) &&
+    isStringArray(candidate.matchedSkills) &&
+    isStringArray(candidate.missingSkills) &&
+    isStringArray(candidate.suggestions)
+  );
+}
+
+function isValidCvMatchResult(value: unknown): value is CvMatchResult {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<CvMatchResult>;
+
+  return (
+    typeof candidate.matchId === 'string' &&
+    typeof candidate.jobId === 'string' &&
+    typeof candidate.jobTitle === 'string' &&
+    typeof candidate.cvKey === 'string' &&
+    typeof candidate.evaluatedAt === 'string' &&
+    isValidScore(candidate.score)
+  );
+}
+
+function readStoredAnalysisResult(): CvAnalysisPageState {
+  const storedResult = window.sessionStorage.getItem(CV_ANALYSIS_RESULT_STORAGE_KEY);
+  if (!storedResult) {
+    return { status: 'empty', result: null };
   }
 
   try {
-    cachedStoredResult = JSON.parse(storedResult) as CvMatchResult;
-    cachedStoredResultRaw = storedResult;
-    return cachedStoredResult;
+    const parsedResult: unknown = JSON.parse(storedResult);
+    if (!isValidCvMatchResult(parsedResult)) {
+      return { status: 'error', result: null };
+    }
+
+    return { status: 'success', result: parsedResult };
   } catch {
     window.sessionStorage.removeItem(CV_ANALYSIS_RESULT_STORAGE_KEY);
-    cachedStoredResult = null;
-    cachedStoredResultRaw = null;
-    return null;
+    return { status: 'error', result: null };
   }
-}
-
-function subscribeToStoredAnalysisResult(onStoreChange: () => void): () => void {
-  window.addEventListener('storage', onStoreChange);
-
-  return () => {
-    window.removeEventListener('storage', onStoreChange);
-  };
-}
-
-function EmptyAnalysisState() {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm">
-      <h2 className="text-xl font-bold text-slate-900">Chưa có kết quả phân tích</h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">
-        Để phân tích CV, hãy mở một công việc và chọn &quot;Đánh giá CV theo công việc&quot;.
-      </p>
-      <div className="mt-6">
-        <Link
-          href="/jobs"
-          className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
-        >
-          Đi đến trang việc làm
-        </Link>
-      </div>
-    </div>
-  );
 }
 
 export default function CVAnalysisPage() {
-  const result = useSyncExternalStore(
-    subscribeToStoredAnalysisResult,
-    readStoredAnalysisResult,
-    () => null,
-  );
+  const [pageState, setPageState] = useState<CvAnalysisPageState>({
+    status: 'loading',
+    result: null,
+  });
 
-  if (!result) {
+  useEffect(() => {
+    queueMicrotask(() => {
+      setPageState(readStoredAnalysisResult());
+    });
+  }, []);
+
+  if (pageState.status === 'loading') {
     return (
       <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
-        <EmptyAnalysisState />
+        <CvAnalysisLoading />
       </div>
     );
   }
+
+  if (pageState.status === 'empty') {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
+        <CvAnalysisEmptyState />
+      </div>
+    );
+  }
+
+  if (pageState.status === 'error') {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
+        <CvAnalysisErrorState />
+      </div>
+    );
+  }
+
+  const { result } = pageState;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
