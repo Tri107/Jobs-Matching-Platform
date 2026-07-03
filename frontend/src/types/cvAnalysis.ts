@@ -21,6 +21,22 @@ export interface CvMatchResult {
   evaluatedAt: string;
 }
 
+export interface BackendMatchResult {
+  matchId: string;
+  userId: string;
+  jobId: string;
+  cvKey: string;
+  score: CvMatchScore;
+  evaluatedAt: string;
+  modelId?: string;
+  ttl?: number;
+}
+
+export interface CvMatchResultsResponse {
+  count: number;
+  items: BackendMatchResult[];
+}
+
 export interface EvaluateCvMatchRequest {
   jobId: string;
   cvKey: string;
