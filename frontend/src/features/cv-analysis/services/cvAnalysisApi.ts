@@ -1,6 +1,6 @@
 import { getIdToken } from '@/features/auth/services/cognitoAuthService';
 import { API_BASE_URL } from '@/lib/constants';
-import type { CvMatchResult, EvaluateCvMatchRequest } from '@/types/cvAnalysis';
+import type { CvMatchResult, EvaluateCvMatchRequest, CvMatchResultsResponse } from '@/types/cvAnalysis';
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const token = await getIdToken();
@@ -65,6 +65,22 @@ export async function getMatchResultById(matchId: string): Promise<CvMatchResult
 
   if (!response.ok) {
     throw new Error(await parseErrorMessage(response, 'Failed to fetch CV match result'));
+  }
+
+  return response.json();
+}
+
+export async function getMatchResults(): Promise<CvMatchResultsResponse> {
+  const baseUrl = getApiBaseUrl();
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${baseUrl}/cv/match-results`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, 'Failed to fetch CV match results'));
   }
 
   return response.json();
