@@ -58,6 +58,7 @@ function mapDynamoJobToFrontendJob(item: DynamoJobItem): Job {
     postedAt: item.postedAt || item.originalPostedAt || item.createdAt || new Date().toISOString(),
     saved: false,
     logo: item.thumbnail || '💻',
+    sourceLink: item.sourceLink,
   };
 }
 

@@ -19,6 +19,7 @@ export interface Job {
   postedAt: string;
   saved: boolean;
   logo: string;
+  sourceLink?: string;
 }
 
 /** Sort values supported by GET /jobs/search API */

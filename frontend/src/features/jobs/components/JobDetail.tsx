@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Job } from '@/types/job';
 import { getJobById } from '@/features/jobs/services/jobApi';
-import { formatSalaryRange } from '@/features/jobs/utils/formatSalary';
-import { MatchBadge } from './MatchBadge';
 import { useFavoritesStore } from '@/features/jobs/hooks/useFavorites';
 import { useCurrentUserEmail } from '@/features/auth/hooks/useCurrentUserEmail';
 import { getCVs } from '@/features/profile/services/cvApi';
@@ -174,7 +172,6 @@ export function JobDetail({ jobId }: JobDetailProps) {
                     ? '5+ năm kinh nghiệm'
                     : `${job.experience} năm kinh nghiệm`}
               </span>
-              <MatchBadge score={job.matchScore} size="md" />
             </div>
 
             {/* Description */}
@@ -237,6 +234,13 @@ export function JobDetail({ jobId }: JobDetailProps) {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <button
               type="button"
+              onClick={() => {
+                if (job.sourceLink) {
+                  window.open(job.sourceLink, '_blank', 'noopener,noreferrer');
+                } else {
+                  alert('Không tìm thấy liên kết ứng tuyển cho công việc này.');
+                }
+              }}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700"
             >
               Ứng tuyển ngay ▶

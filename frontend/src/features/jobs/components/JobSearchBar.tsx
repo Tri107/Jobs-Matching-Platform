@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { HiOutlineMagnifyingGlass, HiOutlineMapPin, HiOutlineBanknotes } from 'react-icons/hi2';
-import { LOCATION_OPTIONS, SALARY_RANGES } from '@/lib/constants';
+import { HiOutlineMagnifyingGlass, HiOutlineMapPin } from 'react-icons/hi2';
+import { LOCATION_OPTIONS } from '@/lib/constants';
 
 interface JobSearchBarProps {
   onSearch: (params: { keyword: string; location: string; salaryMin: number; salaryMax: number }) => void;
@@ -12,15 +12,13 @@ interface JobSearchBarProps {
 export function JobSearchBar({ onSearch, variant = 'compact' }: JobSearchBarProps) {
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('Tất cả địa điểm');
-  const [salaryRange, setSalaryRange] = useState(0);
 
   const handleSearch = () => {
-    const salary = SALARY_RANGES[salaryRange];
     onSearch({
       keyword,
       location,
-      salaryMin: salary.min,
-      salaryMax: salary.max,
+      salaryMin: 0,
+      salaryMax: Infinity,
     });
   };
 
@@ -109,23 +107,6 @@ export function JobSearchBar({ onSearch, variant = 'compact' }: JobSearchBarProp
             {LOCATION_OPTIONS.map((loc) => (
               <option key={loc} value={loc}>
                 {loc}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="hidden h-8 w-px bg-slate-200 lg:block" />
-
-        <div className="flex flex-1 items-center gap-2.5 px-3 py-2">
-          <HiOutlineBanknotes className="h-5 w-5 shrink-0 text-slate-400" />
-          <select
-            value={salaryRange}
-            onChange={(e) => setSalaryRange(Number(e.target.value))}
-            className="w-full cursor-pointer bg-transparent text-sm text-slate-700 outline-none"
-          >
-            {SALARY_RANGES.map((range, idx) => (
-              <option key={range.label} value={idx}>
-                {range.label}
               </option>
             ))}
           </select>

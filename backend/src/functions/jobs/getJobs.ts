@@ -29,14 +29,32 @@ export async function handler(event: APIGatewayProxyEventV2) {
     const limit = parseLimit(queryParams.limit);
     const keyword = queryParams.keyword?.trim().toLowerCase();
 
-    const result = await dynamoDb.send(
-      new ScanCommand({
-        TableName: jobsTable,
-        Limit: limit,
-      })
-    );
+    // Fetch all items from the table recursively
+    let allItems: any[] = [];
+    let lastEvaluatedKey: any = undefined;
+    do {
+      const scanResult: any = await dynamoDb.send(
+        new ScanCommand({
+          TableName: jobsTable,
+          ExclusiveStartKey: lastEvaluatedKey,
+        })
+      );
+      if (scanResult.Items) {
+        allItems = allItems.concat(scanResult.Items.map((item: any) => unmarshall(item)));
+      }
+      lastEvaluatedKey = scanResult.LastEvaluatedKey;
+    } while (lastEvaluatedKey);
 
-    let jobs = (result.Items ?? []).map((item) => unmarshall(item));
+    // Sort in memory by postedAt or createdAt descending to show latest jobs first
+    const getJobTime = (job: any): number => {
+      const dateStr = job.postedAt || job.originalPostedAt || job.createdAt;
+      if (!dateStr) return 0;
+      const parsed = Date.parse(dateStr);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    allItems.sort((a, b) => getJobTime(b) - getJobTime(a));
+
+    let jobs = allItems;
 
     if (keyword) {
       jobs = jobs.filter((job) => {
@@ -55,9 +73,12 @@ export async function handler(event: APIGatewayProxyEventV2) {
       });
     }
 
+    // Apply the limit after sorting and filtering
+    const limitedJobs = jobs.slice(0, limit);
+
     return jsonResponse(200, {
-      count: jobs.length,
-      items: jobs,
+      count: limitedJobs.length,
+      items: limitedJobs,
     });
   } catch (error) {
     console.error("Failed to get jobs", error);
