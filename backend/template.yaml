@@ -59,7 +59,8 @@ Resources:
       StageName: !Ref StageName
       CorsConfiguration:
         AllowOrigins:
-          - http://localhost:3000
+          - https://main.d11bs7h108pe40.amplifyapp.com
+          - https://develop.d11bs7h108pe40.amplifyapp.com
         AllowHeaders:
           - Content-Type
           - Authorization
@@ -725,9 +726,9 @@ Resources:
         - COGNITO
         - Google
       CallbackURLs:
-        - http://localhost:3000/auth/callback
+        - https://main.d11bs7h108pe40.amplifyapp.com/auth/callback
       LogoutURLs:
-        - http://localhost:3000/login
+        - https://main.d11bs7h108pe40.amplifyapp.com/login
 
 Outputs:
   RawJobsQueueUrl:
@@ -752,11 +753,11 @@ Outputs:
     Description: "Cognito Hosted UI domain"
     Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
   CognitoOAuthCallbackUrl:
-    Description: "Local OAuth callback URL"
-    Value: "http://localhost:3000/auth/callback"
+    Description: "OAuth callback URL"
+    Value: "https://main.d11bs7h108pe40.amplifyapp.com/auth/callback"
   CognitoOAuthLogoutUrl:
-    Description: "Local OAuth logout URL"
-    Value: "http://localhost:3000/login"
+    Description: "OAuth logout URL"
+    Value: "https://main.d11bs7h108pe40.amplifyapp.com/login"
   ApiGatewayUrl:
     Description: "HTTP API Gateway base URL"
     Value: !Sub "https://${BackendHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
