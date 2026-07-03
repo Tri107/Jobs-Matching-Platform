@@ -4,7 +4,6 @@ import Link from 'next/link';
 import type { Job } from '@/types/job';
 import { formatSalaryRange } from '@/features/jobs/utils/formatSalary';
 import { formatRelativeDate } from '@/features/jobs/utils/formatDate';
-import { MatchBadge } from './MatchBadge';
 import { HiOutlineHeart, HiHeart, HiOutlineMapPin, HiOutlineClock } from 'react-icons/hi2';
 
 interface JobCardProps {
@@ -40,7 +39,6 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
             >
               {job.title}
             </Link>
-            <p className="mt-0.5 text-sm text-slate-500">{formatSalaryRange(job.salaryMin, job.salaryMax)}</p>
             <p className="mt-0.5 text-sm font-medium text-slate-700">{job.company}</p>
           </div>
 
@@ -80,7 +78,6 @@ export function JobCard({ job, isFavorite, onToggleFavorite, variant = 'list' }:
             <HiOutlineClock className="h-4 w-4" />
             {formatRelativeDate(job.postedAt)}
           </span>
-          <MatchBadge score={job.matchScore} />
         </div>
 
         {/* Skills */}
@@ -106,11 +103,7 @@ function JobCardGrid({ job, isFavorite, onToggleFavorite }: Omit<JobCardProps, '
   return (
     <div className="group relative flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-blue-200 hover:shadow-md">
       {/* Match badge */}
-      {job.matchScore >= 70 && (
-        <div className="absolute right-3 top-3">
-          <MatchBadge score={job.matchScore} size="sm" />
-        </div>
-      )}
+
 
       {/* Title & Logo */}
       <div className="flex items-start gap-3 w-full">

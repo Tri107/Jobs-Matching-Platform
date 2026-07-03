@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
-  HiOutlineBell,
   HiOutlineBars3,
   HiOutlineXMark,
   HiOutlineUserCircle,
@@ -13,7 +12,6 @@ import {
 } from "react-icons/hi2";
 import { useCurrentUserEmail } from "@/features/auth/hooks/useCurrentUserEmail";
 import { useLogout } from "@/features/auth/hooks/useLogout";
-import { mockNotifications } from "@/mock/notifications";
 
 const navLinks = [
   { label: "Tìm việc làm", href: "/jobs" },
@@ -30,7 +28,6 @@ export function Navbar() {
   const { userEmail } = useCurrentUserEmail();
   const { isLoggingOut, logoutError, handleLogout } = useLogout();
 
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
   const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "?";
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -104,18 +101,7 @@ export function Navbar() {
             </div>
           )}
 
-          {/* Notifications */}
-          <button
-            type="button"
-            className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
-          >
-            <HiOutlineBell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+
 
           {/* User dropdown — Desktop */}
           {userEmail && (

@@ -1,10 +1,11 @@
+import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
+import { unmarshall } from "@aws-sdk/util-dynamodb";
 import type { Job } from "../types/job.js";
 import type {
   JobSearchQuery,
   JobSearchResponse,
   JobSearchSort,
 } from "../types/jobSearch.js";
-import { scanJobs } from "../repositories/jobRepository.js";
 import {
   decodePaginationToken,
   encodePaginationToken,
@@ -36,21 +37,52 @@ export async function searchJobs({
   queryStringParameters,
 }: SearchJobsParams): Promise<JobSearchResponse> {
   const filters = parseJobSearchQuery(queryStringParameters);
-  const exclusiveStartKey = parseExclusiveStartKey(filters.nextToken);
 
-  const { items, lastEvaluatedKey } = await scanJobs({
-    tableName,
-    limit: filters.limit,
-    ...(exclusiveStartKey ? { exclusiveStartKey } : {}),
-  });
+  // Scan all items recursively from DynamoDB
+  const dynamoDb = new DynamoDBClient({});
+  let allItems: Job[] = [];
+  let lastEvaluatedKey: any = undefined;
+  do {
+    const scanResult: any = await dynamoDb.send(
+      new ScanCommand({
+        TableName: tableName,
+        ExclusiveStartKey: lastEvaluatedKey,
+      })
+    );
+    if (scanResult.Items) {
+      allItems = allItems.concat(
+        scanResult.Items.map((item: any) => unmarshall(item) as Job)
+      );
+    }
+    lastEvaluatedKey = scanResult.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
 
-  const filteredItems = filterJobs(items, filters);
+  const filteredItems = filterJobs(allItems, filters);
   const sortedItems = sortJobs(filteredItems, filters);
-  const nextToken = encodePaginationToken(lastEvaluatedKey);
+
+  // In-memory pagination
+  let startIndex = 0;
+  if (filters.nextToken) {
+    try {
+      const decoded = decodePaginationToken(filters.nextToken);
+      if (decoded && typeof decoded.index === "number") {
+        startIndex = decoded.index;
+      }
+    } catch (e) {
+      console.error("Failed to decode token", e);
+    }
+  }
+
+  const limit = filters.limit;
+  const paginatedItems = sortedItems.slice(startIndex, startIndex + limit);
+  const hasMore = startIndex + limit < sortedItems.length;
+  const nextToken = hasMore
+    ? encodePaginationToken({ index: startIndex + limit })
+    : undefined;
 
   return {
     count: sortedItems.length,
-    items: sortedItems,
+    items: paginatedItems,
     ...(nextToken ? { nextToken } : {}),
     filters,
   };
