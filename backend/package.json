@@ -1,19 +1,31 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "AI Job Matching Platform Backend",
   "type": "module",
+  "scripts": {
+    "validate": "sam validate",
+    "build": "sam build",
+    "deploy": "sam deploy --guided"
+  },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.162",
     "@types/node": "^25.9.1",
-    "serverless-plugin-typescript": "^2.1.5",
+    "esbuild": "^0.28.1",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1075.0",
+    "@aws-sdk/client-dynamodb": "^3.1072.0",
+    "@aws-sdk/client-lambda": "^3.1066.0",
+    "@aws-sdk/client-s3": "^3.1073.0",
+    "@aws-sdk/client-sqs": "^3.1066.0",
+    "@aws-sdk/client-ssm": "^3.1079.0",
+    "@aws-sdk/client-textract": "^3.1075.0",
+    "@aws-sdk/lib-dynamodb": "^3.1075.0",
+    "@aws-sdk/util-dynamodb": "^3.996.5",
+    "@google/genai": "^2.10.0",
+    "zod": "^3.25.76"
   }
 }

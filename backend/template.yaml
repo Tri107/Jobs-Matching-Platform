@@ -1,0 +1,778 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Jobs-Matching-Platform
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+
+  ProjectName:
+    Type: String
+    Default: jobs-matching
+
+  SerpApiKey:
+    Type: String
+    Description: API Key for SerpAPI (Google Jobs) - stored in SSM Parameter Store
+    Default: /jobs-matching/dev/serpapi-key
+
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth Client ID for Cognito Google identity provider
+
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Google OAuth Client Secret for Cognito Google identity provider
+
+  CognitoDomainPrefix:
+    Type: String
+    Default: jobs-matching-auth-dev
+    Description: Cognito Hosted UI domain prefix
+
+  GeminiApiKeyParameterName:
+    Type: String
+    Default: /jobs-matching/dev/gemini-api-key
+
+  GeminiModel:
+    Type: String
+    Default: gemini-3.1-flash-lite
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures:
+      - x86_64
+    MemorySize: 256
+    Timeout: 30
+    LoggingConfig:
+      LogFormat: JSON
+    Environment:
+      Variables:
+        STAGE: !Ref StageName
+
+Resources:
+# API Gateway
+  BackendHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+      CorsConfiguration:
+        AllowOrigins:
+          - https://main.d11bs7h108pe40.amplifyapp.com
+          - https://develop.d11bs7h108pe40.amplifyapp.com
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - x-original-filename
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        MaxAge: 600
+      Auth:
+        Authorizers:
+          CognitoJwtAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${AuthUserPool}"
+              audience:
+                - !Ref AuthUserPoolClient
+
+# SQS Queues
+  RawJobsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-raw-jobs-dlq-${StageName}"
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  RawJobsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-raw-jobs-queue-${StageName}"
+      VisibilityTimeout: 60 # Should be >= Lambda timeout processing it
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt RawJobsDLQ.Arn
+        maxReceiveCount: 3
+
+# DynamoDB Tables
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-jobs-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: jobId
+          AttributeType: S
+        - AttributeName: hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jobId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: HashIndex
+          KeySchema:
+            - AttributeName: hash
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  SavedJobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-saved-jobs-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: jobId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: jobId
+          KeyType: RANGE
+
+  MatchResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-match-results-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      # TTL: auto-expire old results after 90 days to keep costs low
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: matchId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: matchId
+          KeyType: RANGE
+# S3 Buckets
+  CvBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-cvs-${StageName}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - "*"
+            MaxAge: 3000
+
+  CvBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CvBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${CvBucket}/*"
+
+# Lambda Functions
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-health-check-${StageName}"
+      CodeUri: .
+      Handler: src/functions/health/handler.handler
+      Description: Public health check endpoint for API Gateway
+      Events:
+        HealthCheckApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /health
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/health/handler.ts
+          
+  GetJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-get-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/jobs/getJobs.handler
+      Description: Public endpoint to list jobs from DynamoDB
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+      Events:
+        GetJobsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /jobs
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/jobs/getJobs.ts
+
+  GetJobByIdFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-get-job-by-id-${StageName}"
+      CodeUri: .
+      Handler: src/functions/jobs/getJobById.handler
+      Description: Public endpoint to get a single job by ID from DynamoDB
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+      Events:
+        GetJobByIdApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /jobs/{jobId}
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/jobs/getJobById.ts
+
+  SearchJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-search-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/jobs/searchJobs.handler
+      Description: Public endpoint to search and filter jobs from DynamoDB
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+      Events:
+        SearchJobsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /jobs/search
+            Method: GET
+            PayloadFormatVersion: "2.0"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/jobs/searchJobs.ts
+
+  FetchJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-fetch-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/fetchJobs/handler.handler
+      Description: Fetch jobs from SerpAPI and push to SQS
+      Timeout: 120
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt RawJobsQueue.QueueName
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref RawJobsQueue
+          SERPAPI_KEY: !Ref SerpApiKey
+      Events:
+        DailyFetchJobsSchedule:
+          Type: ScheduleV2
+          Properties:
+            Name: !Sub "${ProjectName}-fetch-jobs-6am-${StageName}"
+            Description: "Run FetchJobsFunction every day at 06:00 Vietnam time"
+            ScheduleExpression: "cron(0 6 * * ? *)"
+            ScheduleExpressionTimezone: "Asia/Ho_Chi_Minh"
+            FlexibleTimeWindow:
+              Mode: "OFF"
+            State: ENABLED
+            Input: |
+              {
+                "source": "eventbridge-scheduler",
+                "location": "Vietnam",
+               "queries": [
+                  "Backend Developer",
+                  "Frontend Developer",
+                  "Cloud Engineer",
+                  "Tester",
+                  "Business Analyst",
+                  "IT Helpdesk",
+                  "Game Developer",
+                  "DevOps Engineer"
+                ]
+              }
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - src/functions/fetchJobs/handler.ts
+
+  ProcessJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/functions/processJobs/handler.handler
+      Description: Receive SQS messages and process/forward them
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NormalizeAndMatchFunction
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt RawJobsQueue.Arn
+            BatchSize: 10
+      Environment:
+        Variables:
+          NORMALIZE_MATCH_FUNCTION_NAME: !Ref NormalizeAndMatchFunction
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - src/functions/processJobs/handler.ts
+
+  NormalizeAndMatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src
+      Handler: functions/normalizeAndMatch/handler.lambda_handler
+      Runtime: python3.13
+      Description: Normalize job and perform deduplication hashing and fuzzy matching
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+
+  SavedJobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-saved-jobs-${StageName}"
+      CodeUri: .
+      Handler: src/functions/savedJobs/handler.handler
+      Description: Manage user saved/favorite jobs (save, unsave, list)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SavedJobsTable
+      Environment:
+        Variables:
+          SAVED_JOBS_TABLE: !Ref SavedJobsTable
+      Events:
+        SaveJobApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /saved-jobs/{jobId}
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        UnsaveJobApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /saved-jobs/{jobId}
+            Method: DELETE
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        GetSavedJobsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /saved-jobs
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/savedJobs/handler.ts
+  EvaluateMatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-evaluate-match-${StageName}"
+      CodeUri: .
+      Handler: src/functions/evaluateMatch/handler.handler
+      Description: Full CV matching pipeline - Textract → Bedrock Nova Micro → DynamoDB
+      Timeout: 60
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MatchResultsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:HeadObject
+                - s3:ListBucket
+              Resource:
+                - !GetAtt CvBucket.Arn
+                - !Sub "${CvBucket.Arn}/*"
+            - Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GeminiApiKeyParameterName}"
+      Environment:
+        Variables:
+          CV_BUCKET_NAME: !Ref CvBucket
+          JOBS_TABLE: !Ref JobsTable
+          MATCH_RESULTS_TABLE: !Ref MatchResultsTable
+          GEMINI_API_KEY_PARAMETER_NAME: !Ref GeminiApiKeyParameterName
+          GEMINI_MODEL: !Ref GeminiModel
+      Events:
+        EvaluateMatchApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/evaluate
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/evaluateMatch/handler.ts
+
+  GetMatchResultsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-get-match-results-${StageName}"
+      CodeUri: .
+      Handler: src/functions/getMatchResults/handler.handler
+      Description: Retrieve CV match evaluation results for the authenticated user
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MatchResultsTable
+      Environment:
+        Variables:
+          MATCH_RESULTS_TABLE: !Ref MatchResultsTable
+      Events:
+        GetMatchResultsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/match-results
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        GetMatchResultByIdApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/match-results/{matchId}
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/getMatchResults/handler.ts
+
+  ExtractCvFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-extract-cv-${StageName}"
+      CodeUri: .
+      Handler: src/functions/extractCv/handler.handler
+      Description: Extract text content from a user CV stored in S3 using AWS Textract
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:HeadObject
+                - s3:ListBucket
+              Resource:
+                - !GetAtt CvBucket.Arn
+                - !Sub "${CvBucket.Arn}/*"
+            - Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+              Resource: "*"
+      Environment:
+        Variables:
+          CV_BUCKET_NAME: !Ref CvBucket
+      Events:
+        ExtractCvApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/extract
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/extractCv/handler.ts
+
+  ManageCvFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-manage-cv-${StageName}"
+      CodeUri: .
+      Handler: src/functions/manageCv/handler.handler
+      Description: Protected endpoint to manage user CVs (Upload, Get, Delete)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource: !GetAtt CvBucket.Arn
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+                - s3:HeadObject
+              Resource: !Sub "${CvBucket.Arn}/*"
+      Environment:
+        Variables:
+          CV_BUCKET_NAME: !Ref CvBucket
+      Events:
+        UploadCvApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/upload
+            Method: POST
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        GetCvsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv
+            Method: GET
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+        DeleteCvApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /cv/{filename}
+            Method: DELETE
+            PayloadFormatVersion: "2.0"
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/manageCv/handler.ts
+
+# Cognito Auth
+  AuthUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectName}-user-pool-${StageName}"
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+
+  AuthUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref AuthUserPool
+
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "openid email profile"
+      AttributeMapping:
+        email: email
+        given_name: given_name
+        family_name: family_name
+        name: name
+
+  AuthUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn:
+      - GoogleIdentityProvider
+    Properties:
+      ClientName: !Sub "${ProjectName}-web-client-${StageName}"
+      UserPoolId: !Ref AuthUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+        - aws.cognito.signin.user.admin
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
+      CallbackURLs:
+        - https://main.d11bs7h108pe40.amplifyapp.com/auth/callback
+      LogoutURLs:
+        - https://main.d11bs7h108pe40.amplifyapp.com/login
+
+Outputs:
+  RawJobsQueueUrl:
+    Description: "URL of the Raw Jobs SQS Queue"
+    Value: !Ref RawJobsQueue
+  RawJobsQueueArn:
+    Description: "ARN of the Raw Jobs SQS Queue"
+    Value: !GetAtt RawJobsQueue.Arn
+  FetchJobsFunction:
+    Description: "Fetch Jobs Lambda Function ARN"
+    Value: !GetAtt FetchJobsFunction.Arn    
+  CognitoUserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref AuthUserPool
+  CognitoUserPoolClientId:
+    Description: "Cognito User Pool App Client ID"
+    Value: !Ref AuthUserPoolClient
+  CognitoRegion:
+    Description: "AWS Region for Cognito"
+    Value: !Ref AWS::Region
+  CognitoHostedUIDomain:
+    Description: "Cognito Hosted UI domain"
+    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+  CognitoOAuthCallbackUrl:
+    Description: "OAuth callback URL"
+    Value: "https://main.d11bs7h108pe40.amplifyapp.com/auth/callback"
+  CognitoOAuthLogoutUrl:
+    Description: "OAuth logout URL"
+    Value: "https://main.d11bs7h108pe40.amplifyapp.com/login"
+  ApiGatewayUrl:
+    Description: "HTTP API Gateway base URL"
+    Value: !Sub "https://${BackendHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+  SavedJobsTableName:
+    Description: "Saved Jobs DynamoDB Table Name"
+    Value: !Ref SavedJobsTable
+  CvBucketName:
+    Description: "CV S3 Bucket Name"
+    Value: !Ref CvBucket
+  CvBucketArn:
+    Description: "CV S3 Bucket ARN"
+    Value: !GetAtt CvBucket.Arn
+  MatchResultsTableName:
+    Description: "Match Results DynamoDB Table Name"
+    Value: !Ref MatchResultsTable
+  EvaluateMatchFunctionArn:
+    Description: "Evaluate Match Lambda Function ARN"
+    Value: !GetAtt EvaluateMatchFunction.Arn

@@ -17,9 +17,9 @@ Stack hiện tại:
 
 ```txt
 Frontend: Next.js + React + TypeScript + Tailwind CSS
-Backend: Node.js + TypeScript + Serverless Framework
+Backend: Node.js + TypeScript + AWS SAM
 Database: DynamoDB
-Deploy backend: AWS Lambda + API Gateway
+Deploy backend: AWS Lambda + API Gateway + CloudFormation
 ```
 
 ---
@@ -499,7 +499,7 @@ giúp backend debug từng function riêng lẻ
 Ví dụ dùng:
 
 ```bash
-serverless invoke local -f searchJobs -p events/searchJobs.json
+sam local invoke SearchJobsFunction -e events/searchJobs.json
 ```
 
 ---

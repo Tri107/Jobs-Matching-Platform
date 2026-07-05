@@ -44,3 +44,25 @@ Thumbs.db
 
 # Optional test/coverage output
 coverage/
+
+# AWS SAM build output
+.aws-sam/
+
+# Old Serverless Framework output
+.serverless/
+
+# Agent / Skill framework
+.agents/
+.agent/
+skills-lock.json
+
+# Python build and virtual environment
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
