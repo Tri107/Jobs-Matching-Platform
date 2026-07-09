@@ -7,6 +7,8 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import type { MatchResult } from "../types/matching.js";
 
+const USER_EVALUATED_AT_INDEX = "UserEvaluatedAtIndex";
+
 export class MatchRepository {
   private docClient: DynamoDBDocumentClient;
   private tableName: string;
@@ -53,5 +55,85 @@ export class MatchRepository {
       })
     );
     return (response.Item as MatchResult) ?? null;
+  }
+
+  async countByUserEvaluatedAtRange(
+    userId: string,
+    startEvaluatedAt: string,
+    endEvaluatedAt: string
+  ): Promise<number> {
+    let used = 0;
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+
+    do {
+      const queryInput = {
+        TableName: this.tableName,
+        IndexName: USER_EVALUATED_AT_INDEX,
+        KeyConditionExpression:
+          "userId = :uid AND evaluatedAt BETWEEN :start AND :end",
+        ExpressionAttributeValues: {
+          ":uid": userId,
+          ":start": startEvaluatedAt,
+          ":end": endEvaluatedAt,
+        },
+        Select: "COUNT" as const,
+        ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
+      };
+
+      const response = await this.docClient.send(
+        new QueryCommand(queryInput)
+      );
+
+      used += response.Count ?? 0;
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return used;
+  }
+
+  async findExistingEvaluation(
+    userId: string,
+    jobId: string,
+    cvKey: string
+  ): Promise<MatchResult | null> {
+    if (!userId.trim()) {
+      throw new Error("userId is required to find existing evaluation");
+    }
+    if (!jobId.trim()) {
+      throw new Error("jobId is required to find existing evaluation");
+    }
+    if (!cvKey.trim()) {
+      throw new Error("cvKey is required to find existing evaluation");
+    }
+
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+
+    do {
+      const queryInput = {
+        TableName: this.tableName,
+        IndexName: USER_EVALUATED_AT_INDEX,
+        KeyConditionExpression: "userId = :uid",
+        ExpressionAttributeValues: {
+          ":uid": userId,
+        },
+        ScanIndexForward: false,
+        ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
+      };
+
+      const response = await this.docClient.send(
+        new QueryCommand(queryInput)
+      );
+      const existingEvaluation = (response.Items ?? [])
+        .map((item) => item as MatchResult)
+        .find((item) => item.jobId === jobId && item.cvKey === cvKey);
+
+      if (existingEvaluation) {
+        return existingEvaluation;
+      }
+
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return null;
   }
 }
