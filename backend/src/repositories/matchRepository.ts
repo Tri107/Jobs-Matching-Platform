@@ -7,6 +7,8 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import type { MatchResult } from "../types/matching.js";
 
+const USER_EVALUATED_AT_INDEX = "UserEvaluatedAtIndex";
+
 export class MatchRepository {
   private docClient: DynamoDBDocumentClient;
   private tableName: string;
@@ -53,5 +55,39 @@ export class MatchRepository {
       })
     );
     return (response.Item as MatchResult) ?? null;
+  }
+
+  async countByUserEvaluatedAtRange(
+    userId: string,
+    startEvaluatedAt: string,
+    endEvaluatedAt: string
+  ): Promise<number> {
+    let used = 0;
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+
+    do {
+      const queryInput = {
+        TableName: this.tableName,
+        IndexName: USER_EVALUATED_AT_INDEX,
+        KeyConditionExpression:
+          "userId = :uid AND evaluatedAt BETWEEN :start AND :end",
+        ExpressionAttributeValues: {
+          ":uid": userId,
+          ":start": startEvaluatedAt,
+          ":end": endEvaluatedAt,
+        },
+        Select: "COUNT" as const,
+        ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
+      };
+
+      const response = await this.docClient.send(
+        new QueryCommand(queryInput)
+      );
+
+      used += response.Count ?? 0;
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return used;
   }
 }
