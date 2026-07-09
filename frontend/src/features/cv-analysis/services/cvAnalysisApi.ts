@@ -2,6 +2,26 @@ import { getIdToken } from '@/features/auth/services/cognitoAuthService';
 import { API_BASE_URL } from '@/lib/constants';
 import type { CvMatchResult, EvaluateCvMatchRequest, CvMatchResultsResponse } from '@/types/cvAnalysis';
 
+export interface ApiErrorBody {
+  message?: string;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+  resetAt?: string;
+}
+
+export class CvAnalysisApiError extends Error {
+  status: number;
+  body?: ApiErrorBody;
+
+  constructor(status: number, message: string, body?: ApiErrorBody) {
+    super(message);
+    this.name = 'CvAnalysisApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const token = await getIdToken();
   if (!token) {
@@ -22,17 +42,26 @@ function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
 
-async function parseErrorMessage(response: Response, fallbackMessage: string): Promise<string> {
+async function parseErrorBody(response: Response): Promise<ApiErrorBody | undefined> {
   try {
-    const body = await response.json();
-    if (typeof body?.message === 'string' && body.message.trim()) {
-      return body.message;
+    const body: unknown = await response.json();
+    if (body && typeof body === 'object') {
+      return body as ApiErrorBody;
     }
   } catch {
-    // Ignore invalid error bodies and use the fallback below.
+    // Ignore invalid error bodies and use the fallback message below.
   }
 
-  return `${fallbackMessage}: ${response.status}`;
+  return undefined;
+}
+
+async function throwApiError(response: Response, fallbackMessage: string): Promise<never> {
+  const body = await parseErrorBody(response);
+  const message = typeof body?.message === 'string' && body.message.trim()
+    ? body.message
+    : `${fallbackMessage}: ${response.status}`;
+
+  throw new CvAnalysisApiError(response.status, message, body);
 }
 
 export async function evaluateCvMatch(
@@ -48,7 +77,7 @@ export async function evaluateCvMatch(
   });
 
   if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, 'Failed to evaluate CV match'));
+    await throwApiError(response, 'Failed to evaluate CV match');
   }
 
   return response.json();
@@ -64,7 +93,7 @@ export async function getMatchResultById(matchId: string): Promise<CvMatchResult
   });
 
   if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, 'Failed to fetch CV match result'));
+    await throwApiError(response, 'Failed to fetch CV match result');
   }
 
   return response.json();
@@ -80,7 +109,7 @@ export async function getMatchResults(): Promise<CvMatchResultsResponse> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, 'Failed to fetch CV match results'));
+    await throwApiError(response, 'Failed to fetch CV match results');
   }
 
   return response.json();

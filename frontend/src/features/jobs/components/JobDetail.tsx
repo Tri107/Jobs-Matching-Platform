@@ -8,7 +8,7 @@ import { getJobById } from '@/features/jobs/services/jobApi';
 import { useFavoritesStore } from '@/features/jobs/hooks/useFavorites';
 import { useCurrentUserEmail } from '@/features/auth/hooks/useCurrentUserEmail';
 import { getCVs } from '@/features/profile/services/cvApi';
-import { evaluateCvMatch } from '@/features/cv-analysis/services/cvAnalysisApi';
+import { CvAnalysisApiError, evaluateCvMatch } from '@/features/cv-analysis/services/cvAnalysisApi';
 import type { CVItem } from '@/types/cv';
 import {
   HiOutlineMapPin,
@@ -24,6 +24,9 @@ import {
 interface JobDetailProps {
   jobId: string;
 }
+
+const QUOTA_LIMIT_MESSAGE = 'Bạn đã dùng hết 3 lượt phân tích CV hôm nay. Vui lòng thử lại vào ngày mai.';
+const CV_ANALYSIS_FALLBACK_ERROR = 'Không thể phân tích CV. Vui lòng thử lại.';
 
 export function JobDetail({ jobId }: JobDetailProps) {
   const router = useRouter();
@@ -70,7 +73,7 @@ export function JobDetail({ jobId }: JobDetailProps) {
   }, [jobId]);
 
   async function handleEvaluateCv(cvKey: string) {
-    if (isAnalyzingCv) {
+    if (isAnalyzingCv || !jobId.trim() || !cvKey.trim()) {
       return;
     }
 
@@ -84,8 +87,13 @@ export function JobDetail({ jobId }: JobDetailProps) {
       });
       sessionStorage.setItem('cvAnalysisResult', JSON.stringify(result));
       router.push('/cv-analysis');
-    } catch {
-      setCvError('Không thể phân tích CV. Vui lòng thử lại.');
+    } catch (error) {
+      if (error instanceof CvAnalysisApiError && error.status === 429) {
+        setCvError(QUOTA_LIMIT_MESSAGE);
+        return;
+      }
+
+      setCvError(CV_ANALYSIS_FALLBACK_ERROR);
     } finally {
       setIsAnalyzingCv(false);
     }
@@ -265,7 +273,7 @@ export function JobDetail({ jobId }: JobDetailProps) {
             <button
               type="button"
               onClick={() => setShowSelector(!showSelector)}
-              disabled={isAnalyzingCv}
+              disabled={isAnalyzingCv || !jobId.trim()}
               className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <HiOutlineDocumentArrowUp className="h-5 w-5" />
@@ -310,7 +318,7 @@ export function JobDetail({ jobId }: JobDetailProps) {
                           key={cv.key}
                           type="button"
                           onClick={() => handleEvaluateCv(cv.key)}
-                          disabled={isAnalyzingCv}
+                          disabled={isAnalyzingCv || !jobId.trim() || !cv.key.trim()}
                           className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-left text-xs font-medium text-slate-700 transition-colors hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <HiOutlineDocumentArrowUp className="h-4 w-4 shrink-0 text-slate-400" />
@@ -320,8 +328,7 @@ export function JobDetail({ jobId }: JobDetailProps) {
                     </div>
                     {isAnalyzingCv && (
                       <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-center">
-                        <p className="text-xs font-semibold text-blue-700">Đang phân tích CV...</p>
-                        <p className="mt-1 text-[10px] text-blue-600">Quá trình này có thể mất vài giây.</p>
+                        <p className="text-xs font-semibold text-blue-700">Đang phân tích CV, vui lòng chờ vài giây...</p>
                       </div>
                     )}
                   </div>
