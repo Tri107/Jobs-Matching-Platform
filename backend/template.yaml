@@ -148,11 +148,22 @@ Resources:
           AttributeType: S
         - AttributeName: matchId
           AttributeType: S
+        - AttributeName: evaluatedAt
+          AttributeType: S
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
         - AttributeName: matchId
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: UserEvaluatedAtIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: evaluatedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
 # S3 Buckets
   CvBucket:
     Type: AWS::S3::Bucket
