@@ -26,3 +26,11 @@ export interface EvaluateMatchRequest {
   jobId: string;
   cvKey: string;
 }
+
+export interface EvaluationQuota {
+  limit: number;
+  used: number;
+  remaining: number;
+  resetAt: string;
+  isLimitReached: boolean;
+}
