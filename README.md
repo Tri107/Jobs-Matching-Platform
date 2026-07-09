@@ -39,7 +39,7 @@ The frontend application consists of the following key pages:
 
 Here is the general architecture showing how the frontend, AWS serverless backend, and AI models interact:
 
-![System Architecture](docs/Jobs-Matching-Platform-v3.drawio.png)
+![System Architecture](./docs/Jobs-Matching-Platform-v3.drawio.png)
 
 ---
 
