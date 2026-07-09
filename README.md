@@ -39,43 +39,7 @@ The frontend application consists of the following key pages:
 
 Here is the general architecture showing how the frontend, AWS serverless backend, and AI models interact:
 
-```mermaid
-graph TD
-    %% Frontend Layer
-    FE[Next.js Frontend / AWS Amplify] -->|1. Register & Login| Cognito(Amazon Cognito)
-    FE -->|2. Upload CV PDF| S3[(Amazon S3 Bucket)]
-    FE -->|3. Send API Requests| APIGW(Amazon API Gateway)
-
-    %% Authentication & Authorization
-    APIGW -->|Verify JWT Token| Cognito
-
-    %% Backend Layer
-    subgraph AWS Serverless Backend
-        APIGW -->|Route Requests| Lambda[AWS Lambda Functions]
-        
-        %% Database
-        Lambda -->|Query / Scan / Write| DynamoDB[(Amazon DynamoDB)]
-        
-        %% OCR & AI Processing
-        Lambda -->|Download CV & Extract Text| Textract(Amazon Textract)
-        Lambda -->|Read API Key| SSM[SSM Parameter Store]
-        Lambda -->|Send Job + CV Text| Gemini(Google Gemini AI API)
-    end
-
-    %% Ingestion Pipeline
-    EventBridge[AWS EventBridge] -->|Trigger Schedule| FetchLambda[FetchJobs Lambda]
-    FetchLambda -->|Scrape jobs from SerpApi| SQS[AWS SQS: RawJobsQueue]
-    SQS -->|Trigger Event| ProcessLambda[ProcessJobs Lambda]
-    ProcessLambda -->|Normalize & Fuzzy Match| NormLambda[NormalizeAndMatch Lambda]
-    NormLambda -->|Save Clean Jobs| DynamoDB
-
-    classDef aws fill:#FF9900,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef frontend fill:#3B82F6,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef ai fill:#10B981,stroke:#fff,stroke-width:2px,color:#fff;
-    class Cognito,S3,APIGW,Lambda,DynamoDB,Textract,SSM,EventBridge,SQS,FetchLambda,ProcessLambda,NormLambda aws;
-    class FE frontend;
-    class Gemini ai;
-```
+![System Architecture](docs/Jobs-Matching-Platform-v3.drawio.png)
 
 ---
 
